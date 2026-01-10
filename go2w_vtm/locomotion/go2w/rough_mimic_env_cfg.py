@@ -8,7 +8,7 @@ from ..mimic_env_cfg import ActionsCfg, MimicEnvCfg
 from ..mimic_env_cfg import RewardsCfg
 
 import go2w_vtm
-from go2w_vtm.Robot.go2w import UNITREE_GO2W_CFG
+from go2w_vtm.Robot.go2w import UNITREE_GO2W_CFG,UNITREE_GO2W_NO_MOTOR_LIMIT_CFG
 from go2w_vtm.terrains.config.rough import MIMIC_GYM_TERRAIN_CFG
 
 from isaaclab.utils.noise import UniformNoiseCfg
@@ -88,7 +88,7 @@ class UnitreeGo2WMimicEnvCfg(MimicEnvCfg):
         super().__post_init__()
 
         # ------------------------------Sence------------------------------
-        self.scene.robot = UNITREE_GO2W_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+        self.scene.robot = UNITREE_GO2W_NO_MOTOR_LIMIT_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
         # ------------------------------Terrain------------------------------
         self.scene.terrain.terrain_type = "generator"
         self.scene.terrain.terrain_generator = MIMIC_GYM_TERRAIN_CFG
