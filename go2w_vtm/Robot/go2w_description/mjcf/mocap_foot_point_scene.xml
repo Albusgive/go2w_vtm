@@ -1,0 +1,112 @@
+<mujoco model="go2w scene">
+    <include file="go2w_noact.xml" />
+
+    <statistic center="0 0 0.1" extent="0.8" />
+    <option timestep="0.001" />
+    <include file="trench_box_terrain.xml"/>
+
+    <default>
+        <default class="translation">
+            <position kp="1000" dampratio=".2" ctrlrange="-1.0 0.5" />
+        </default>
+        <default class="rotation_root">
+            <position kp="0" dampratio="0" ctrlrange="-1.571 1.571" />
+        </default>
+    </default>
+
+    <visual>
+        <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0" />
+        <rgba haze="0.15 0.25 0.35 1" />
+        <global azimuth="-130" elevation="-20" />
+    </visual>
+
+    <asset>
+        <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512"
+            height="3072" />
+        <texture type="cube" name="groundbox" builtin="checker" mark="edge" rgb1="0.2 0.3 0.4"
+            rgb2="0.1 0.2 0.3"
+            markrgb="0.8 0.8 0.8" width="300" height="300" />
+        <material name="groundbox" texture="groundbox" texuniform="true" texrepeat="5 5"
+            reflectance="0.2" />
+        <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.2 0.3 0.4"
+            rgb2="0.1 0.2 0.3"
+            markrgb="0.8 0.8 0.8" width="300" height="300" />
+        <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5"
+            reflectance="0.2" />
+        <mesh name="flag" vertex="0 0 0  0.6 0 0  0 0 0.3 0 0.02 0 0 -0.02 0" />
+    </asset>
+
+    <worldbody>
+        <light pos="0 0 1.5" dir="0 0 -1" directional="true" />
+
+
+        <site name="world_ref" />
+        <replicate count="30" offset="0.1 0 0">
+            <site size="0.02" rgba="1 0 0 .5" />
+        </replicate>
+
+    </worldbody>
+    <actuator>
+        <position name="FL_wheel_x" site="FL_foot_joint" refsite="FL_foot_joint_ref"
+            gear="1 0 0 0 0 0"
+            class="translation" />
+        <position name="FL_wheel_y" site="FL_foot_joint" refsite="FL_foot_joint_ref"
+            gear="0 1 0 0 0 0"
+            class="translation" />
+        <position name="FL_wheel_z" site="FL_foot_joint" refsite="FL_foot_joint_ref"
+            gear="0 0 1 0 0 0"
+            class="translation" />
+
+        <position name="FR_wheel_x" site="FR_foot_joint" refsite="FR_foot_joint_ref"
+            gear="1 0 0 0 0 0"
+            class="translation" />
+        <position name="FR_wheel_y" site="FR_foot_joint" refsite="FR_foot_joint_ref"
+            gear="0 1 0 0 0 0"
+            class="translation" />
+        <position name="FR_wheel_z" site="FR_foot_joint" refsite="FR_foot_joint_ref"
+            gear="0 0 1 0 0 0"
+            class="translation" />
+
+        <position name="RL_wheel_x" site="RL_foot_joint" refsite="RL_foot_joint_ref"
+            gear="1 0 0 0 0 0"
+            class="translation" />
+        <position name="RL_wheel_y" site="RL_foot_joint" refsite="RL_foot_joint_ref"
+            gear="0 1 0 0 0 0"
+            class="translation" />
+        <position name="RL_wheel_z" site="RL_foot_joint" refsite="RL_foot_joint_ref"
+            gear="0 0 1 0 0 0"
+            class="translation" />
+
+        <position name="RR_wheel_x" site="RR_foot_joint" refsite="RR_foot_joint_ref"
+            gear="1 0 0 0 0 0"
+            class="translation" />
+        <position name="RR_wheel_y" site="RR_foot_joint" refsite="RR_foot_joint_ref"
+            gear="0 1 0 0 0 0"
+            class="translation" />
+        <position name="RR_wheel_z" site="RR_foot_joint" refsite="RR_foot_joint_ref"
+            gear="0 0 1 0 0 0"
+            class="translation" />
+
+        <velocity name="FR_foot" joint="FR_foot_joint" kv="0.5" forcerange="-23.5 23.5" />
+        <velocity name="FL_foot" joint="FL_foot_joint" kv="0.5" forcerange="-23.5 23.5" />
+        <velocity name="RR_foot" joint="RR_foot_joint" kv="0.5" forcerange="-23.5 23.5" />
+        <velocity name="RL_foot" joint="RL_foot_joint" kv="0.5" forcerange="-23.5 23.5" />
+
+        <!-- 姿态约束 -->
+        <position name="base_rx" site="base_link" refsite="world_ref" gear="0 0 0 1 0 0"
+            class="rotation_root" />
+        <position name="base_ry" site="base_link" refsite="world_ref" gear="0 0 0 0 1 0"
+            class="rotation_root" />
+        <position name="base_rz" site="base_link" refsite="world_ref" gear="0 0 0 0 0 1"
+            class="rotation_root" />
+    </actuator>
+    <sensor>
+        <touch name="touch0" site="FL_foot_joint" />
+        <touch name="touch1" site="FR_foot_joint" />
+        <touch name="touch2" site="RL_foot_joint" />
+        <touch name="touch3" site="RR_foot_joint" />
+        <framequat name="imu_quat" objtype="site" objname="imu" noise="0.0" />
+        <subtreecom name="FR_wheel_link_com" body="FL_hip" />
+
+    </sensor>
+</mujoco>

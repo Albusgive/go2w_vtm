@@ -1,0 +1,13 @@
+Metadata-Version: 2.4
+Name: go2w_vtm
+Version: 0.0.1
+Home-page: 
+Author: albusgive
+Maintainer: albusgive
+License: Apache License 2.0
+Requires-Python: >=3.10
+Dynamic: author
+Dynamic: keywords
+Dynamic: license
+Dynamic: maintainer
+Dynamic: requires-python

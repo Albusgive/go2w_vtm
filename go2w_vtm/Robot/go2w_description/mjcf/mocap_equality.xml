@@ -1,0 +1,10 @@
+<mujoco model="mocap_equality">
+    <actuator>
+    </actuator>
+    <equality>
+        <connect site1="FL_foot_joint" site2="FL_foot_joint_ref"/>
+        <connect site1="FR_foot_joint" site2="FR_foot_joint_ref"/>
+        <connect site1="RL_foot_joint" site2="RL_foot_joint_ref"/>
+        <connect site1="RR_foot_joint" site2="RR_foot_joint_ref"/>
+    </equality>
+</mujoco>

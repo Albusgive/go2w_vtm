@@ -1,0 +1,44 @@
+{
+  "os":  "Linux-6.8.0-90-generic-x86_64-with-glibc2.35",
+  "python":  "CPython 3.11.14",
+  "startedAt":  "2025-12-23T08:08:20.016625Z",
+  "args":  [
+    "--input_file",
+    "./Robot/go2w_description/mjcf/clean_scene.xml",
+    "--input_fps",
+    "30",
+    "--output_name",
+    "go2w_jump1"
+  ],
+  "program":  "/home/albusgive2/go2w_vtm/go2w_vtm/./scripts/key_2_npz.py",
+  "codePath":  "scripts/key_2_npz.py",
+  "codePathLocal":  "scripts/key_2_npz.py",
+  "email":  "mb18743920955@163.com",
+  "root":  "/home/albusgive2/go2w_vtm/go2w_vtm",
+  "host":  "albusgive2",
+  "executable":  "/home/albusgive2/anaconda3/envs/go2w_isaaclab231_sim51/bin/python",
+  "cpu_count":  6,
+  "cpu_count_logical":  12,
+  "gpu":  "NVIDIA GeForce RTX 4070",
+  "gpu_count":  1,
+  "disk":  {
+    "/":  {
+      "total":  "982818799616",
+      "used":  "835645313024"
+    }
+  },
+  "memory":  {
+    "total":  "33489903616"
+  },
+  "gpu_nvidia":  [
+    {
+      "name":  "NVIDIA GeForce RTX 4070",
+      "memoryTotal":  "12878610432",
+      "cudaCores":  5888,
+      "architecture":  "Ada",
+      "uuid":  "GPU-1954238c-c4c7-7db7-9eca-637c0f72a84c"
+    }
+  ],
+  "cudaVersion":  "13.0",
+  "writerId":  "yuw3qazel5gwqk20rqs6okqh1c0t8frk"
+}

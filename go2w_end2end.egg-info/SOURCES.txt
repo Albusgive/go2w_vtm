@@ -1,0 +1,8 @@
+setup.py
+go2w_end2end/__init__.py
+go2w_end2end.egg-info/PKG-INFO
+go2w_end2end.egg-info/SOURCES.txt
+go2w_end2end.egg-info/dependency_links.txt
+go2w_end2end.egg-info/not-zip-safe
+go2w_end2end.egg-info/requires.txt
+go2w_end2end.egg-info/top_level.txt

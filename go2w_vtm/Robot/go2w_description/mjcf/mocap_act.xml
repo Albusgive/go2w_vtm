@@ -1,0 +1,55 @@
+<mujoco model="mocap_act">
+    <default>
+        <default class="translation">
+            <position kp="1000" dampratio=".5" ctrlrange="-1.0 0.5" />
+        </default>
+    </default>
+
+    <actuator>
+        <position name="FL_wheel_x" site="FL_foot_joint" refsite="FL_foot_joint_ref"
+            gear="1 0 0 0 0 0"
+            class="translation" />
+        <position name="FL_wheel_y" site="FL_foot_joint" refsite="FL_foot_joint_ref"
+            gear="0 1 0 0 0 0"
+            class="translation" />
+        <position name="FL_wheel_z" site="FL_foot_joint" refsite="FL_foot_joint_ref"
+            gear="0 0 1 0 0 0"
+            class="translation" />
+
+        <position name="FR_wheel_x" site="FR_foot_joint" refsite="FR_foot_joint_ref"
+            gear="1 0 0 0 0 0"
+            class="translation" />
+        <position name="FR_wheel_y" site="FR_foot_joint" refsite="FR_foot_joint_ref"
+            gear="0 1 0 0 0 0"
+            class="translation" />
+        <position name="FR_wheel_z" site="FR_foot_joint" refsite="FR_foot_joint_ref"
+            gear="0 0 1 0 0 0"
+            class="translation" />
+
+        <position name="RL_wheel_x" site="RL_foot_joint" refsite="RL_foot_joint_ref"
+            gear="1 0 0 0 0 0"
+            class="translation" />
+        <position name="RL_wheel_y" site="RL_foot_joint" refsite="RL_foot_joint_ref"
+            gear="0 1 0 0 0 0"
+            class="translation" />
+        <position name="RL_wheel_z" site="RL_foot_joint" refsite="RL_foot_joint_ref"
+            gear="0 0 1 0 0 0"
+            class="translation" />
+
+        <position name="RR_wheel_x" site="RR_foot_joint" refsite="RR_foot_joint_ref"
+            gear="1 0 0 0 0 0"
+            class="translation" />
+        <position name="RR_wheel_y" site="RR_foot_joint" refsite="RR_foot_joint_ref"
+            gear="0 1 0 0 0 0"
+            class="translation" />
+        <position name="RR_wheel_z" site="RR_foot_joint" refsite="RR_foot_joint_ref"
+            gear="0 0 1 0 0 0"
+            class="translation" />
+
+
+        <velocity name="FR_wheel_joint" joint="FR_foot_joint" kv="0.5" forcerange="-23.5 23.5" />
+        <velocity name="FL_wheel_joint" joint="FL_foot_joint" kv="0.5" forcerange="-23.5 23.5" />
+        <velocity name="RR_wheel_joint" joint="RR_foot_joint" kv="0.5" forcerange="-23.5 23.5" />
+        <velocity name="RL_wheel_joint" joint="RL_foot_joint" kv="0.5" forcerange="-23.5 23.5" />
+    </actuator>
+</mujoco>

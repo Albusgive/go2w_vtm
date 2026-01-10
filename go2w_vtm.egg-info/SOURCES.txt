@@ -1,0 +1,7 @@
+setup.py
+go2w_vtm/__init__.py
+go2w_vtm.egg-info/PKG-INFO
+go2w_vtm.egg-info/SOURCES.txt
+go2w_vtm.egg-info/dependency_links.txt
+go2w_vtm.egg-info/not-zip-safe
+go2w_vtm.egg-info/top_level.txt

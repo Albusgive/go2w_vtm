@@ -1,0 +1,14 @@
+<mujoco model="high_platform">
+  <asset>
+    <mesh name="high_platform_mesh0" file="meshs/high_platform_mesh0.stl"/>
+    <mesh name="high_platform_mesh1" file="meshs/high_platform_mesh1.stl"/>
+    <mesh name="high_platform_mesh2" file="meshs/high_platform_mesh2.stl"/>
+    <mesh name="high_platform_mesh3" file="meshs/high_platform_mesh3.stl"/>
+  </asset>
+  <worldbody>
+    <geom type="mesh" mesh="high_platform_mesh0" rgba="0.8 0.6 0.4 1" pos="-0.8 -3.0 0" contype="1" conaffinity="1" group="1"/>
+    <geom type="mesh" mesh="high_platform_mesh1" rgba="0.8 0.6 0.4 1" pos="-0.8 -3.0 0" contype="1" conaffinity="1" group="1"/>
+    <geom type="mesh" mesh="high_platform_mesh2" rgba="0.8 0.6 0.4 1" pos="-0.8 -3.0 0" contype="1" conaffinity="1" group="1"/>
+    <geom type="mesh" mesh="high_platform_mesh3" rgba="0.8 0.6 0.4 1" pos="-0.8 -3.0 0" contype="1" conaffinity="1" group="1"/>
+  </worldbody>
+</mujoco>
