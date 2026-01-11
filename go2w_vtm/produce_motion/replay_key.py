@@ -32,4 +32,4 @@ with mujoco.viewer.launch_passive(m, d) as viewer:
         else:
             wait_time = d.time - (time.time() - step_start)
             if wait_time > 0:
-                time.sleep(wait_time*2)
+                time.sleep(wait_time)
