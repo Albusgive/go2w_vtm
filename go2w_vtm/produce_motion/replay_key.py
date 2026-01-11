@@ -5,7 +5,6 @@ import mujoco
 import mujoco.viewer
 import numpy as np
 from KeyFrame import KeyFrame
-import mj_func
 import glfw
 import go2w_vtm 
 import os

@@ -51,7 +51,7 @@ with mujoco.viewer.launch_passive(plk.model, plk.data,key_callback=key_callback)
         mujoco.mj_forward(plk.model, plk.data)
         mj_viewer.sync()
         
-# # 创建渲染器
+# # # 创建渲染器
 # viewer = mujoco_viewer.MujocoViewer(plk.model, plk.data)
 # # 模拟循环
 # while viewer.is_alive:
