@@ -88,7 +88,7 @@ class UnitreeGo2WMimicEnvCfg(MimicEnvCfg):
         super().__post_init__()
 
         # ------------------------------Sence------------------------------
-        self.scene.robot = UNITREE_GO2W_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+        self.scene.robot = UNITREE_GO2W_NO_MOTOR_LIMIT_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
         # ------------------------------Terrain------------------------------
         self.scene.terrain.terrain_type = "generator"
         self.scene.terrain.terrain_generator = MIMIC_GYM_TERRAIN_CFG
@@ -138,9 +138,9 @@ class UnitreeGo2WMimicEnvCfg(MimicEnvCfg):
         self.events.randomize_com_positions.params["asset_cfg"].body_names = [self.base_link_name]
         # ------------------------------Rewards------------------------------
         self.rewards.action_rate_l2.weight = -1e-2
-        self.rewards.motion_body_pos.weight = 3.0
-        self.rewards.motion_body_lin_vel.weight = 3.0
-        self.rewards.motion_global_anchor_pos.weight = 5.0
+        self.rewards.motion_body_pos.weight = 2.0
+        self.rewards.motion_body_lin_vel.weight = 2.0
+        self.rewards.motion_global_anchor_pos.weight = 4.0
 
         # If the weight of rewards is 0, set rewards to None
         if self.__class__.__name__ == "UnitreeGo2WMimicEnvCfg":
