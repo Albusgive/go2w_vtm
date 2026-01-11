@@ -113,7 +113,7 @@ MIMIC_GYM_TERRAIN_CFG = TerrainGeneratorCfg(
         "mimic_trench": terrain_gen.MimicTrenchBoxTerrainCfg(
             # proportion=0.5, 
             
-            high_platform_x=[0.0,2.3,1.5],  
+            high_platform_x=[0.0,2.45,1.5],  
             high_platform_z=[-0.5,-0.5,-2.0],      
             high_platform_half_width=[1.0,1.0,1.5],
             high_platform_half_height=[0.5,0.5,0.1],
