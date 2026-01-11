@@ -1,4 +1,4 @@
-<mujoco model="go2w">
+<mujoco model="go2w_mocap2free">
   <compiler angle="radian" meshdir="meshs" assetdir="assets" autolimits="true" />
 
   <option cone="elliptic" impratio="100" timestep="0.005" />
@@ -39,8 +39,8 @@
     </default>
 
     <default class="wheel_site">
-        <site size="0.12" rgba="1 0 0 0"/>
-      </default>
+      <site size="0.12" rgba="1 0 0 0" />
+    </default>
   </default>
 
   <asset>
@@ -94,6 +94,8 @@
     <mesh file="d435i_6.obj" />
     <mesh file="d435i_7.obj" />
     <mesh file="d435i_8.obj" />
+
+    <material name="mocap_material" rgba="0.9 0 0 0.2" />
   </asset>
 
   <worldbody>
@@ -169,10 +171,11 @@
                 quat="0.661419 0.248219 0.250051 0.662108" mass="0.98"
                 diaginertia="0.003 0.0016 0.0016" />
               <joint name="FL_foot_joint" pos="0 0 0" axis="0 1 0" />
-              <site name="FL_foot_joint" pos="0 0 0" class="wheel_site"/>
+              <site name="FL_foot_joint" pos="0 0 0" class="wheel_site" />
               <geom type="mesh" rgba="0.15 0.15 0.15 1" mesh="wheel" pos="0 0.0 0"
-                quat="0.0 1.0 0.0 0.0"/>
-              <!-- <geom pos="0 0.0 0" quat="0.0 1.0 0.0 0.0" type="mesh" mesh="wheel" class="foot" /> -->
+                quat="0.0 1.0 0.0 0.0" />
+              <!-- <geom pos="0 0.0 0" quat="0.0 1.0 0.0 0.0" type="mesh" mesh="wheel" class="foot"
+              /> -->
             </body>
 
           </body>
@@ -212,7 +215,7 @@
                 quat="0.661419 0.248219 0.250051 0.662108" mass="0.98"
                 diaginertia="0.003 0.0016 0.0016" />
               <joint name="FR_foot_joint" pos="0 0 0" axis="0 1 0" />
-              <site name="FR_foot_joint" class="wheel_site"/>
+              <site name="FR_foot_joint" class="wheel_site" />
               <geom type="mesh" rgba="0.15 0.15 0.15 1" mesh="wheel" pos="0 -0.0 0" />
               <!-- <geom pos="0 0.0 0" type="mesh" mesh="wheel" class="foot" /> -->
             </body>
@@ -254,10 +257,11 @@
                 quat="0.661419 0.248219 0.250051 0.662108" mass="0.98"
                 diaginertia="0.003 0.0016 0.0016" />
               <joint name="RL_foot_joint" pos="0 0 0" axis="0 1 0" />
-              <site name="RL_foot_joint" class="wheel_site"/>
+              <site name="RL_foot_joint" class="wheel_site" />
               <geom type="mesh" rgba="0.15 0.15 0.15 1" mesh="wheel" pos="0 0.0 0"
-                quat="0.0 1.0 0.0 0.0"/>
-              <!-- <geom pos="0 0.0 0" quat="0.0 1.0 0.0 0.0" type="mesh" mesh="wheel" class="foot" /> -->
+                quat="0.0 1.0 0.0 0.0" />
+              <!-- <geom pos="0 0.0 0" quat="0.0 1.0 0.0 0.0" type="mesh" mesh="wheel" class="foot"
+              /> -->
             </body>
 
           </body>
@@ -299,43 +303,34 @@
                 quat="0.661419 0.248219 0.250051 0.662108" mass="0.98"
                 diaginertia="0.003 0.0016 0.0016" />
               <joint name="RR_foot_joint" pos="0 0 0" axis="0 1 0" />
-              <site name="RR_foot_joint" class="wheel_site"/>
-              <geom type="mesh" rgba="0.15 0.15 0.15 1" mesh="wheel" pos="0 -0.00 0"/>
+              <site name="RR_foot_joint" class="wheel_site" />
+              <geom type="mesh" rgba="0.15 0.15 0.15 1" mesh="wheel" pos="0 -0.00 0" />
               <!-- <geom pos="0 0.0 0" type="mesh" mesh="wheel" class="foot" /> -->
             </body>
 
           </body>
         </body>
       </body>
+    </body>
 
-
-      <!-- self point ref -->
-      <body name="foot_point_z_axis" pos="0 0 -0.35">
-        <body pos="0.2 0.15 0">
-          <geom name="FL_foot_joint_ref" type="box" size=".05 .05 .05" rgba="1 0 0 .5"
-            contype="0"
-            conaffinity="0" />
-          <site name="FL_foot_joint_ref" />
-        </body>
-        <body pos="0.18 -0.15 0">
-          <geom name="FR_foot_joint_ref" type="box" size=".05 .05 .05" rgba="1 0 0 .5"
-            contype="0"
-            conaffinity="0" />
-          <site name="FR_foot_joint_ref" />
-        </body>
-        <body pos="-0.18 0.15 0">
-          <geom name="RL_foot_joint_ref" type="box" size=".05 .05 .05" rgba="1 0 0 .5"
-            contype="0"
-            conaffinity="0" />
-          <site name="RL_foot_joint_ref" />
-        </body>
-        <body pos="-0.2 -0.15 0">
-          <geom name="RR_foot_joint_ref" type="box" size=".05 .05 .05" rgba="1 0 0 .5"
-            contype="0"
-            conaffinity="0" />
-          <site name="RR_foot_joint_ref" />
-        </body>
-      </body>
+    <body name="base_mocap" mocap="true">
+      <geom type="box" size="0.1 0.1 0.1" material="mocap_material" class="visual" />
+    </body>
+        <body name="FL_foot_joint_ref" pos="0.2 0.15 0.085" mocap="true">
+      <geom name="FL_foot_joint_ref" type="box" size=".085 .085 .085" material="mocap_material" class="visual" />
+      <site name="FL_foot_joint_ref" />
+    </body>
+    <body name="FR_foot_joint_ref" pos="0.18 -0.15 0.085" mocap="true">
+      <geom name="FR_foot_joint_ref" type="box" size=".085 .085 .085" material="mocap_material" class="visual" />
+      <site name="FR_foot_joint_ref" />
+    </body>
+    <body name="RL_foot_joint_ref" pos="-0.18 0.15 0.085" mocap="true">
+      <geom name="RL_foot_joint_ref" type="box" size=".085 .085 .085" material="mocap_material" class="visual" />
+      <site name="RL_foot_joint_ref" />
+    </body>
+    <body name="RR_foot_joint_ref" pos="-0.2 -0.15 0.085" mocap="true">
+      <geom name="RR_foot_joint_ref" type="box" size=".085 .085 .085" material="mocap_material" class="visual" />
+      <site name="RR_foot_joint_ref" />
     </body>
 
   </worldbody>

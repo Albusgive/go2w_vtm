@@ -242,7 +242,7 @@ class EventCfg:
         },
     )
     
-    randomize_motion = EventTerm(
+    randomize_terrain_motion = EventTerm(
         func=mdp.randomize_terrain_motion,
         mode="reset",
         params={

@@ -97,15 +97,17 @@ class UnitreeGo2WMimicEnvCfg(MimicEnvCfg):
         leap1_path = os.path.join(go2w_vtm.MONTION_DIR, "leap1.npz")
         leap2_path = os.path.join(go2w_vtm.MONTION_DIR, "leap2.npz")
         leap3_path = os.path.join(go2w_vtm.MONTION_DIR, "leap3.npz")
-        self.commands.motion.motion_files = {"leap1": leap1_path,"leap2": leap2_path,"leap3": leap3_path}    #: dict[str, str]
+        leap_k_path = os.path.join(go2w_vtm.MONTION_DIR, "leap_k.npz")
+        climb_k_path = os.path.join(go2w_vtm.MONTION_DIR, "climb_k.npz")
+        self.commands.motion.motion_files = {"leap_k": leap_k_path,"climb_k": climb_k_path}    #: dict[str, str]
         self.commands.motion.anchor_body_name = "base"
         self.commands.motion.body_names = [
             'base', 'FL_hip', 'FR_hip', 'RL_hip', 'RR_hip', 'FL_thigh', 'FR_thigh', 'RL_thigh', 'RR_thigh', 
             'FL_calf', 'FR_calf', 'RL_calf', 'RR_calf', 'FL_foot', 'FR_foot', 'RL_foot', 'RR_foot'
         ]
         self.commands.motion.joint_pos_names = self.leg_joint_names
-        self.commands.motion.terrain_motion_map = {"mimic_trench":["leap1"],
-                                                #    "mimic_high_platform":["jump", "leap"]
+        self.commands.motion.terrain_motion_map = {"mimic_trench":["leap_k"],
+                                                   "mimic_high_platform":["climb_k"]
                                                    }
         # ------------------------------Observations------------------------------
         self.observations.policy.joint_pos.func = mdp.joint_pos_rel

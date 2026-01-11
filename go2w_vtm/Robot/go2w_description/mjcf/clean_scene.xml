@@ -19,11 +19,17 @@
 
   <worldbody>
     <light pos="0 0 1.5" dir="0 0 -1" directional="true" />
-    <!-- <geom name="floor" size="0 0 0.05" type="plane" material="groundplane" /> -->
+    
+
   </worldbody>
-  <include file="go2w_noact.xml" />
-  <!-- <include file="go2w_jump.xml" /> -->
-  <include file="go2w_leap1.xml" />
-  <include file="trench_terrain.xml"/>
-   <!-- <include file="human_k.xml" /> -->
+  <include file="go2w_mocap2free.xml" />
+  <include file="trench_box_terrain.xml" />
+  <!-- <include file="high_platform.xml" /> -->
+
+  <!-- motion -->
+   <!-- <include file="go2w_jump.xml" /> -->
+  <!-- <include file="go2w_leap1.xml" /> -->
+  <!-- <include file="human_k.xml" /> -->
+   <include file="compute_k.xml" />
+   <!-- <include file="compute_k2.xml" /> -->
 </mujoco>

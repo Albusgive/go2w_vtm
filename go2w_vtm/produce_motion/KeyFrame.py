@@ -15,8 +15,8 @@ class KeyData:
         self.mocap_quat: List[float] = []
         self.act: List[float] = []
         self.ctrl: List[float] = []
-
-
+        
+        
 class KeyFrame:
     def __init__(self):
         # Body filtering
@@ -42,7 +42,7 @@ class KeyFrame:
         self.keys_in_memory: List[KeyData] = []
     
     def setRecordMocapBody2Body(self, model, body_name: str):
-        """ 如果是mocap body会记录mocap_pos mocap_quat 并拼接到qpos中"""
+        """ 如果是mocap body会记录第一个mocap_pos mocap_quat 并拼接到qpos中"""
         body_id = model.body(name=body_name).id
         self.mocap_body_id = model.body_mocapid[body_id]
         if self.mocap_body_id != -1:
@@ -99,25 +99,19 @@ class KeyFrame:
         self.qvel_indices.clear()
         print("✅ Cleared body filter. Will record full state.")
 
-    def setSaveFields(self, qpos: Optional[bool] = None, qvel: Optional[bool] = None,
-                      act: Optional[bool] = None, ctrl: Optional[bool] = None,mocap_pos: Optional[bool] = None,
-                      mocap_quat: Optional[bool] = None):
+    def setSaveFields(self, qpos: Optional[bool] = False, qvel: Optional[bool] = False,
+                      act: Optional[bool] = False, ctrl: Optional[bool] = False,mocap_pos: Optional[bool] = False,
+                      mocap_quat: Optional[bool] = False):
         """
         设置哪些字段需要保存到 XML。
         time 始终保存，不可关闭。
         """
-        if qpos is not None:
-            self.save_qpos = qpos
-        if qvel is not None:
-            self.save_qvel = qvel
-        if act is not None:
-            self.save_act = act
-        if ctrl is not None:
-            self.save_ctrl = ctrl
-        if mocap_pos is not None:
-            self.save_mocap_pos = mocap_pos
-        if mocap_quat is not None:
-            self.save_mocap_quat = mocap_quat
+        self.save_qpos = qpos
+        self.save_qvel = qvel
+        self.save_act = act
+        self.save_ctrl = ctrl
+        self.save_mocap_pos = mocap_pos
+        self.save_mocap_quat = mocap_quat
 
         print(f"✅ Save fields updated: qpos={self.save_qpos}, qvel={self.save_qvel}, "
               f"act={self.save_act}, ctrl={self.save_ctrl}, mocap_pos={self.save_mocap_pos}, mocap_quat={self.save_mocap_quat}")
@@ -135,15 +129,13 @@ class KeyFrame:
             raise ValueError("fps must be positive.")
         self.set_record_dt(1.0 / fps)
         
-
-    def record(self, model, data, name: str = "",time:float=None):
+    def get_now_key(self, model, data, name: str = "",time:float=None):
         key = KeyData()
         key.name = name
         if time is not None:
             key.time = time
         else:
             key.time = data.time
-            
         # qpos
         if self.save_qpos:
             if self.is_mocap_body:
@@ -156,7 +148,6 @@ class KeyFrame:
                     key.qpos = [float(data.qpos[i]) for i in self.qpos_indices]
                 elif model.nq > 0:
                     key.qpos = data.qpos.tolist()
-
         # qvel
         if self.save_qvel:
             if self.is_mocap_body:
@@ -166,21 +157,20 @@ class KeyFrame:
                     key.qvel = [float(data.qvel[i]) for i in self.qvel_indices]
                 elif model.nv > 0:
                     key.qvel = data.qvel.tolist()
-
         # act
         if self.save_act and model.na > 0:
             key.act = data.act.tolist()
-
         # ctrl
         if self.save_ctrl and model.nu > 0:
             key.ctrl = data.ctrl.tolist()
-            
         if self.save_mocap_pos and model.nmocap > 0:
-            key.mocap_pos = data.mocap_pos.tolist()
-            
+            key.mocap_pos = data.mocap_pos.flatten().tolist()
         if self.save_mocap_quat and model.nmocap > 0:
-            key.mocap_quat = data.mocap_quat.tolist()
-
+            key.mocap_quat = data.mocap_quat.flatten().tolist()
+        return key
+    
+    def record(self, model, data, name: str = "",time:float=None):
+        key = self.get_now_key(model, data, name,time)
         self.keys_in_memory.append(key)
         
         
@@ -189,7 +179,6 @@ class KeyFrame:
         记录当前状态到内存（如果满足时间间隔要求）
         """
         current_time = data.time
-
         # 判断是否该记录
         should_record = False
         if self.record_dt is None:
@@ -202,10 +191,15 @@ class KeyFrame:
                 
         if not should_record:
             return  # skip recording
-        
         self.record(model, data, name,time=time)
 
+    def remove_key(self,n:int):
+        """Remove the nth keyframe from memory"""
+        self.keys_in_memory.pop(n)
         
+    def cover_key(self,n:int, model, data, name: str = "",time:float=None):
+        """Replace the nth keyframe with the given keyframe"""
+        self.keys_in_memory[n] = self.get_now_key(model, data, name,time)
 
     def save_as_xml(self, file_path: str):
         """
@@ -233,9 +227,9 @@ class KeyFrame:
             if self.save_ctrl and key_data.ctrl:
                 key_elem.set("ctrl", " ".join(map(str, key_data.ctrl)))
             if self.save_mocap_pos and key_data.mocap_pos:
-                key_elem.set("mocap_pos", " ".join(map(str, key_data.mocap_pos)))
+                key_elem.set("mpos", " ".join(map(str, key_data.mocap_pos)))
             if self.save_mocap_quat and key_data.mocap_quat:
-                key_elem.set("mocap_quat", " ".join(map(str, key_data.mocap_quat)))
+                key_elem.set("mquat", " ".join(map(str, key_data.mocap_quat)))
 
         indent(root)
         tree = ET.ElementTree(root)

@@ -48,6 +48,7 @@ import os
 import go2w_vtm
 import time
 
+
 @configclass
 class ReplayMotionsSceneCfg(InteractiveSceneCfg):
     """Configuration for a replay motions scene."""

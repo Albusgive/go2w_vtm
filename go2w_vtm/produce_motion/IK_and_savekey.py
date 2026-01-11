@@ -49,7 +49,7 @@ class mink_cfg(ik_cfg):
         
         
 class PlanningKeyframe:
-    def __init__(self,file_path:str,cfg:ik_cfg):
+    def __init__(self,file_path:str,cfg:ik_cfg,editing:bool=False):
         self.model = mujoco.MjModel.from_xml_path(file_path)
         self.anchor_ref_body_mids = [self.model.body(site).mocapid[0] for site in cfg.anchor_ref]
         self.anchor_body_ids = [self.model.site_bodyid[mujoco.mj_name2id(self.model,mujoco.mjtObj.mjOBJ_SITE,anchor)] for anchor in cfg.anchor]
@@ -90,19 +90,43 @@ class PlanningKeyframe:
             self.configuration.update()
             self.posture_task.set_target_from_configuration(self.configuration)
         
+        # 编辑模式 手动k然后保存mocap 插帧模式 根据mocap生成keyframe
+        self.editing = editing
+        
         # 数据保存
         self.keyframe_data = KeyFrame.KeyFrame()
-        self.keyframe_data.setRecordMocapBody2Body(self.model,self.cfg.mocap_robot_name)
-        self.keyframe_data.setSaveFields(qvel=False,act=False,ctrl=False,mocap_pos=False,mocap_quat=False)
-        self.history_times = []
-        self.history_anchor_ref_pos = []
-        self.history_anchor_ref_quat = []
+        if self.editing:
+            self.keyframe_data.setSaveFields(mocap_pos=True,mocap_quat=True)
+        else:
+            self.keyframe_data.setRecordMocapBody2Body(self.model,self.cfg.mocap_robot_name)
+            self.keyframe_data.setSaveFields(qpos=True,qvel=True,mocap_pos=True)
         self.nkey = 0
-        
-        self.ex_keyframe_data = KeyFrame.KeyFrame()
-        self.ex_keyframe_data.setRecordMocapBody2Body(self.model,self.cfg.mocap_robot_name)
-        self.ex_keyframe_data.setSaveFields(qvel=False,act=False,ctrl=False,mocap_pos=False,mocap_quat=False)
-        
+    
+    
+    @staticmethod
+    def _slerp(q0, q1, t):
+        """Spherical linear interpolation between two unit quaternions."""
+        q0 = np.asarray(q0, dtype=np.float64)
+        q1 = np.asarray(q1, dtype=np.float64)
+        dot = np.dot(q0, q1)
+
+        if dot < 0.0:
+            q1 = -q1
+            dot = -dot
+
+        if dot > 0.9995:
+            result = q0 + t * (q1 - q0)
+            return result / np.linalg.norm(result)
+
+        theta_0 = np.arccos(dot)
+        sin_theta_0 = np.sin(theta_0)
+        theta = theta_0 * t
+        sin_theta = np.sin(theta)
+
+        s0 = np.cos(theta) - dot * sin_theta / sin_theta_0
+        s1 = sin_theta / sin_theta_0
+        return s0 * q0 + s1 * q1
+    
     def compute_pid_force(self):
         target_pos = self.data.site_xpos[self.anchor_ref_site_ids]  # (N, 3)
         anchor_pos = self.data.site_xpos[self.anchor_site_ids]      # (N, 3)
@@ -177,10 +201,6 @@ class PlanningKeyframe:
     '''    记录，保存，回放，插帧   '''
     def record(self,time:float=None):
         self.keyframe_data.record(self.model,self.data,"",time=time)
-        if time is not None:
-            self.history_times.append(time)
-        self.history_anchor_ref_pos.append(self.data.mocap_pos)
-        self.history_anchor_ref_quat.append(self.data.mocap_quat)
         print(f"Recorded key frame {self.nkey}")
         self.nkey += 1
         
@@ -189,29 +209,125 @@ class PlanningKeyframe:
     
     def save_keyframe(self,save_path:str):
         self.keyframe_data.save_as_xml(save_path)
-        
-    def save_ex_keyframe(self,save_path:str):
-        self.ex_keyframe_data.save_as_xml(save_path)
-        
-    def clear_ex_keyframe(self):
-        self.ex_keyframe_data.clear()
     
     def remove_key(self,n:int):
         self.keyframe_data.remove_key(n)
-        self.history_times.pop(n)
-        self.history_anchor_ref_pos.pop(n)
-        self.history_anchor_ref_quat.pop(n)
         self.nkey -= 1
         print(f"Removed key frame {n}")
+    
+    def cover_key(self,n:int, name: str = "",time:float=None):
+        self.keyframe_data.cover_key(n,self.model,self.data,name,time)
+        print(f"Covered key frame {n}")
         
     def reset_key(self,n:int):
-        self.data.mocap_pos[:] = self.history_anchor_ref_pos[n]
-        self.data.mocap_quat[:] = self.history_anchor_ref_quat[n]
+        self.data.mocap_pos[:] = self.keyframe_data.keys_in_memory[n].mocap_pos
+        self.data.mocap_quat[:] = self.keyframe_data.keys_in_memory[n].mocap_quat
         self.update()
         print(f"Reset to key frame {n}")
-    
-    def compute_frame(self,target_fps:int=30):
-        if self.history_times[0] is None:
-            raise ValueError("History times are not recorded")
-        #读取历史的anchor位姿 计算mocap关键帧位置，计算mocap路径，update并保存到ex_keyframe_data中
         
+    ''' 计算帧 '''
+    def interpolate_and_record(self, fps: float):
+        """
+        根据 model 中的 keyframes（含 key_time）进行 MoCap 插值，
+        按目标 FPS 生成中间帧，每帧调用 update() 并 record()。
+        
+        Args:
+            fps (float): 目标帧率（如 30.0）
+        """
+        if self.model.nkey == 0:
+            raise ValueError("No keyframes found in the model.")
+        
+        # --- Step 1: 获取 key 时间和 MoCap 状态 ---
+        key_times = np.array(self.model.key_time)  # (nkey,)
+        nkey = len(key_times)
+        sort_idx = np.argsort(key_times)
+        key_times = key_times[sort_idx]
+
+        # 找出所有 mocap bodies（从 model.body_mocapid != -1）
+        mocap_body_ids = []
+        mocap_body_names = []
+        for i in range(self.model.nbody):
+            if self.model.body_mocapid[i] != -1:
+                name = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_BODY, i)
+                mocap_body_ids.append(i)
+                mocap_body_names.append(name)
+        
+        if not mocap_body_ids:
+            raise ValueError("No mocap bodies found in the model.")
+
+        # 提取每个 key 的 mocap_pos 和 mocap_quat
+        key_mocap_pos = {}   # {body_name: (nkey, 3)}
+        key_mocap_quat = {}  # {body_name: (nkey, 4)}
+
+        for name, body_id in zip(mocap_body_names, mocap_body_ids):
+            mocap_id = self.model.body_mocapid[body_id]
+            pos_list = []
+            quat_list = []
+            for k in sort_idx:
+                # MuJoCo 3.0+ stores mocap poses in key_mpos / key_mquat
+                start3 = 3 * mocap_id
+                start4 = 4 * mocap_id
+                pos = self.model.key_mpos[k][start3:start3+3].copy()
+                quat = self.model.key_mquat[k][start4:start4+4].copy()
+                pos_list.append(pos)
+                quat_list.append(quat)
+            key_mocap_pos[name] = np.stack(pos_list)      # (nkey, 3)
+            key_mocap_quat[name] = np.stack(quat_list)    # (nkey, 4)
+
+        # Normalize quaternions
+        for name in mocap_body_names:
+            q = key_mocap_quat[name]
+            q /= np.linalg.norm(q, axis=1, keepdims=True)
+            key_mocap_quat[name] = q
+
+        # --- Step 2: 生成插值时间序列 ---
+        t_start = key_times[0]
+        t_end = key_times[-1]
+        total_duration = t_end - t_start
+        if total_duration <= 0:
+            total_duration = 1.0 / fps  # fallback
+
+        n_interp = int(np.ceil(total_duration * fps)) + 1
+        interp_times = np.linspace(t_start, t_end, n_interp)
+
+        # --- Step 3: 插值并逐帧处理 ---
+        print(f"Interpolating from {t_start:.3f}s to {t_end:.3f}s at {fps} FPS → {n_interp} frames")
+
+        # 临时重置 data 到初始状态（避免 previous state interference）
+        self.reset_world()
+
+        for t in interp_times:
+            # Set mocap bodies via interpolation
+            for name in mocap_body_names:
+                body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, name)
+                mocap_id = self.model.body_mocapid[body_id]
+
+                # Position: linear interpolation
+                pos_interp = np.array([
+                    np.interp(t, key_times, key_mocap_pos[name][:, dim])
+                    for dim in range(3)
+                ])
+
+                # Quaternion: SLERP
+                if t <= key_times[0]:
+                    quat_interp = key_mocap_quat[name][0]
+                elif t >= key_times[-1]:
+                    quat_interp = key_mocap_quat[name][-1]
+                else:
+                    idx = np.searchsorted(key_times, t) - 1
+                    t0, t1 = key_times[idx], key_times[idx + 1]
+                    alpha = (t - t0) / (t1 - t0)
+                    quat_interp = self._slerp(key_mocap_quat[name][idx], key_mocap_quat[name][idx + 1], alpha)
+
+                # Assign to data
+                self.data.mocap_pos[mocap_id] = pos_interp
+                self.data.mocap_quat[mocap_id] = quat_interp
+
+            # Run your IK/control pipeline
+            self.update()
+            for _ in range(10):
+                mujoco.mj_step(self.model, self.data)
+
+            # Record the resulting state (qpos, qvel, etc.)
+            self.record(time=t)
+        print(f"✅ Interpolation complete. Recorded {len(self.keyframe_data.keys_in_memory)} frames.")

@@ -25,9 +25,9 @@ class MimicTrenchTerrainCfg(HfTerrainBaseCfg):
     
 
 @configclass
-class MimicTrenchBoxTerrainCfg(SubTerrainBaseCfg):
+class MimicFixBoxTerrainCfg(SubTerrainBaseCfg):
     
-    function = mimic_gym_terrain.trench_box_terrain
+    function = mimic_gym_terrain.fix_box_terrain
     
     ''' 下列参数均是基于机器人坐标偏移 '''
     high_platform_x: list[float] = MISSING                 

@@ -1,4 +1,4 @@
-<mujoco model="go2w">
+<mujoco model="go2w_mocap">
   <compiler angle="radian" meshdir="meshs" autolimits="true" />
 
   <option cone="elliptic" impratio="100" timestep="0.001" />

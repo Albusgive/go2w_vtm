@@ -116,7 +116,7 @@ def create_mujoco_box_mesh(
     return box
 
 
-def trench_box_terrain(difficulty: float, cfg: mimic_gym_terrain_cfg.MimicTrenchBoxTerrainCfg) -> np.ndarray:
+def fix_box_terrain(difficulty: float, cfg: mimic_gym_terrain_cfg.MimicFixBoxTerrainCfg) -> np.ndarray:
     """
     高台只能使用box,如果修改高度场就会出现初始z为最高位置
     """
@@ -172,14 +172,6 @@ def high_platform_terrain(difficulty: float, cfg: mimic_gym_terrain_cfg.MimicHig
         box_center_pos=[cfg.high_platform_start_x[i],0,cfg.high_platform_height[i]/2]
         box_mesh = create_mujoco_box_mesh(box_size, box_center_pos, origin)
         meshes_list.append(box_mesh)
-    
-    #再x=0处加一个档条
-    extents = [0.05, cfg.size[1], 1]
-    box = trimesh.creation.box(extents=extents)
-    # 平移到目标位置
-    box_pos = [0,cfg.size[1]/2,0.5]
-    box.apply_translation(box_pos)
-    meshes_list.append(box)
     
     if cfg.save_to_mjcf:
         save_terrain_as_mjcf_with_stl(meshes_list=meshes_list,

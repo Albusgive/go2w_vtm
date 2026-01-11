@@ -12,8 +12,8 @@ mujoco.mj_loadAllPluginLibraries(plugin_path)
 file_path = go2w_vtm.GO2W_MJCF_DIR + "/mocap_scene_terrain.xml"
 file_path2 = go2w_vtm.GO2W_MJCF_DIR + "/mocap_pd_scene.xml"
 
-save_npz_path = go2w_vtm.GO2W_PRODUCE_MOTION_K_DIR + "/human_k.npz"
-save_xml_path = go2w_vtm.GO2W_MJCF_DIR + "/human_k.xml"
+# save_npz_path = go2w_vtm.GO2W_PRODUCE_MOTION_K_DIR + "/human_k.npz"
+save_xml_path = go2w_vtm.GO2W_MJCF_DIR + "/human_k2.xml"
 
 anchor = ["FL_foot_joint", "FR_foot_joint", "RR_foot_joint", "RL_foot_joint"]
 anchor_ref = [ref+"_ref" for ref in anchor]
@@ -28,7 +28,7 @@ cfg3.ki = 1.0
 cfg3.i_max = 1000.0
 cfg3.force_limit = 1000
 
-plk = IK_and_savekey.PlanningKeyframe(file_path,cfg) # mink
+plk = IK_and_savekey.PlanningKeyframe(file_path,cfg,True) # mink
 # plk = planning_keyframe.PlanningKeyframe(file_path2,cfg2) # mujoco pd
 # plk = planning_keyframe.PlanningKeyframe(file_path,cfg3) # self pid
 
@@ -39,7 +39,7 @@ def key_callback(key:int):
         plk.record(frame_time)
         frame_time += 0.0303
     if key == glfw.KEY_SPACE:
-        plk.save_qpos(save_npz_path)
+        # plk.save_qpos(save_npz_path)
         plk.save_keyframe(save_xml_path)
     if key == glfw.KEY_BACKSPACE:
         plk.reset_world()

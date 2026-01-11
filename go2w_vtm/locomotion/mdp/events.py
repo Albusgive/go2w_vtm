@@ -251,9 +251,9 @@ def randomize_motion(
     env_ids: torch.Tensor,
     command_name: str):
     """Randomize the motion of the asset."""
+    command: MotionCommand = env.command_manager.get_term(command_name)
     if command.terrain_motion_table is not None:
             return
-    command: MotionCommand = env.command_manager.get_term(command_name)
     command.motion_ids[env_ids] = torch.randint(0, command.motion.num_motions, (len(env_ids),),device=command.device)
     
 def randomize_terrain_motion(
