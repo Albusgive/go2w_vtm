@@ -3,9 +3,11 @@
     <!-- <include file="go2w_ray_caster.xml" /> -->
 
     <!-- <include file="high_platform.xml" /> -->
-    <!-- <include file="trench_box_terrain.xml"/> -->
+    <include file="trench_box_terrain.xml"/>
 
     <!-- <include file="mocap_act.xml" /> -->
+
+    <include file="human_k.xml" />
 
     <statistic center="0 0 0.1" extent="0.8" />
     <option timestep="0.001" />
@@ -35,9 +37,9 @@
     <worldbody>
         <light pos="0 0 1.5" dir="0 0 -1" directional="true" />
 
-        <replicate count="30" offset="0.1 0 0">
+        <!-- <replicate count="30" offset="0.1 0 0">
             <site size="0.02" rgba="1 0 0 .5" />
-        </replicate>
+        </replicate> -->
 
 
     </worldbody>

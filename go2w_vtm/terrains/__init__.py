@@ -1,3 +1,5 @@
 from .hf_terrains_cfg import RectangularTerrainCfgX,RectangularTerrainCfgAround,ShaftTerrainCfgAround
 from .mesh_terrains_cfg import MeshFloatingBoxesTerrainCfg
 from .mimic_gym_terrain_cfg import *
+from .confirm_terrain_generator import ConfirmTerrainGenerator
+from .confirm_terrain_importer import ConfirmTerrainImporter,ConfirmTerrainImporterCfg

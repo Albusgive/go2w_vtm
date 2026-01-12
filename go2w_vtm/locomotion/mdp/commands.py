@@ -560,6 +560,7 @@ from isaaclab.utils.math import (
     yaw_quat,
 )
 from torch.nn.utils.rnn import pad_sequence
+from go2w_vtm.terrains import ConfirmTerrainImporter
 
 
 class MotionLoader:
@@ -711,6 +712,9 @@ class MotionCommand(CommandTerm):
         self.enable = torch.ones(self.num_envs, dtype=torch.bool, device=self.device)  #对于不进行mimic的环境给False
         
         self.time_steps = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
+        self.ref_body_pos_relative_w = torch.zeros(self.num_envs, len(cfg.body_names), 3, device=self.device)
+        self.ref_body_quat_relative_w = torch.zeros(self.num_envs, len(cfg.body_names), 4, device=self.device)
+        self.ref_body_quat_relative_w[:, :, 0] = 1.0
         self.body_pos_relative_w = torch.zeros(self.num_envs, len(cfg.body_names), 3, device=self.device)
         self.body_quat_relative_w = torch.zeros(self.num_envs, len(cfg.body_names), 4, device=self.device)
         self.body_quat_relative_w[:, :, 0] = 1.0
@@ -741,15 +745,18 @@ class MotionCommand(CommandTerm):
             self.joint_indexes = self.robot.find_joints(self.cfg.joint_names, preserve_order=True)[0]
             self.joint_indexes = torch.tensor(self.joint_indexes, dtype=torch.long, device=self.device)
             
-        # 构建地形 -> motion_id 的映射表
+            
+        self.terrain = self._env.scene.terrain
+        if isinstance(self.terrain, ConfirmTerrainImporter):
+            self.terrain: ConfirmTerrainImporter = self._env.scene.terrain
+        
+        # 构建地形 -> motion_id 的映射表 TODO 并行framekey
         if self.cfg.terrain_motion_map is not None:
-            #构建env_terrain_ids (env,tid)
-            self.col_terrain_names, sub_terrains_cfgs = self.get_env_terrains()
-            self.terrain_to_idx = {name: i for i, name in enumerate(sub_terrains_cfgs)}
-            self.env_terrain_ids = torch.zeros(self.num_envs, dtype=torch.int, device=self.device)
-            for env_idx in range(self.num_envs):
-                terrain_name = self.get_terrain_name(env_idx)
-                self.env_terrain_ids[env_idx] = self.terrain_to_idx[terrain_name]
+            sub_terrain_type_names = self.terrain.sub_terrain_type_names
+            if sub_terrain_type_names is None:
+                raise ValueError("terrain is not a ConfirmTerrainImporter or terrain_type is not generator \
+                                 or curriculum is not enabled.")
+            self.terrain_to_idx = {name: i for i, name in enumerate(sub_terrain_type_names)}
             
             # Step 1: 构建 terrain_id -> list[motion_id]
             num_terrains = len(self.terrain_to_idx)
@@ -778,11 +785,13 @@ class MotionCommand(CommandTerm):
 
             # Step 3: 构建向量化采样张量表 (T, max_len)，未配置的地形用 -1 填充
             table = torch.full((num_terrains, max_len), -1, dtype=torch.long, device=self.device)
+            env_ids = torch.ones(self.num_envs, dtype=torch.long, device=self.device)
+            env_terrain_ids = self.terrain.get_sub_terrain_type(env_ids)
 
             for tid, motions in enumerate(terrain_id_to_motion_ids):
                 if len(motions) == 0:
                     # 保持 -1（已由 torch.full 初始化） 修改enable
-                    self.enable[self.env_terrain_ids == tid] = False
+                    self.enable[env_terrain_ids == tid] = False
                     continue
                 L = len(motions)
                 motions_t = torch.tensor(motions, dtype=torch.long, device=self.device)
@@ -891,6 +900,14 @@ class MotionCommand(CommandTerm):
         self.metrics["error_anchor_rot"] = quat_error_magnitude(self.anchor_quat_w, self.robot_anchor_quat_w)
         self.metrics["error_anchor_lin_vel"] = torch.norm(self.anchor_lin_vel_w - self.robot_anchor_lin_vel_w, dim=-1)
         self.metrics["error_anchor_ang_vel"] = torch.norm(self.anchor_ang_vel_w - self.robot_anchor_ang_vel_w, dim=-1)
+        
+        self.metrics["error_ref_body_pos"] = torch.norm(self.ref_body_pos_relative_w - self.body_pos_w, dim=-1).mean(
+            dim=-1
+        )
+        self.metrics["error_ref_body_rot"] = quat_error_magnitude(self.ref_body_quat_relative_w, self.body_quat_w).mean(
+            dim=-1
+        )
+        
 
         self.metrics["error_body_pos"] = torch.norm(self.body_pos_relative_w - self.robot_body_pos_w, dim=-1).mean(
             dim=-1
@@ -1053,30 +1070,15 @@ class MotionCommand(CommandTerm):
         见isaaclab/terrains/terrain_generator.py -> _generate_curriculum_terrains
         col_names 为TerrainGeneratorCfg.sub_terrains的key
         '''
-        from isaaclab.terrains import TerrainImporter
+        from go2w_vtm.terrains import ConfirmTerrainImporter
         if self._env.scene.terrain is None:
             raise ValueError("Terrain is not initialized")
         if not self._env.scene.terrain.cfg.terrain_generator.curriculum:
             raise ValueError("TerrainGeneratorCfg.curriculum is not True")
 
-        terrain:TerrainImporter = self._env.scene.terrain
-        proportions = np.array([sub_cfg.proportion for sub_cfg in terrain.cfg.terrain_generator.sub_terrains.values()])
-        proportions /= np.sum(proportions)
-        sub_indices = []
-        for index in range(terrain.cfg.terrain_generator.num_cols):
-            sub_index = np.min(np.where(index / terrain.cfg.terrain_generator.num_cols + 0.001 < np.cumsum(proportions))[0])
-            sub_indices.append(sub_index)
-        sub_indices = np.array(sub_indices, dtype=np.int32)
-        # create a list of all terrain configs
-        sub_terrains_cfgs = list(terrain.cfg.terrain_generator.sub_terrains.keys())
-        col_terrain_names = [sub_terrains_cfgs[sub_indices[sub_col]] for sub_col in range(terrain.cfg.terrain_generator.num_cols)]
-        # env_terrain_names = [col_names[env_col] for env_col in terrain.terrain_types]
-        return col_terrain_names, sub_terrains_cfgs
-
-    def get_terrain_name(self, env_ids):
-        """ 获取环境的子地形名称 """
-        cols = self._env.scene.terrain.terrain_types[env_ids]
-        return self.col_terrain_names[cols]
+        terrain:ConfirmTerrainImporter = self._env.scene.terrain
+        return terrain.sub_terrain_type_names
+    
     
     # def reset_motion_by_terrain(self, env_ids: Sequence[int]):
     #     if self.terrain_motion_table is None:
@@ -1090,13 +1092,8 @@ class MotionCommand(CommandTerm):
     def _set_debug_vis_impl(self, debug_vis: bool):
         if debug_vis:
             if not hasattr(self, "current_anchor_visualizer"):
-                self.current_anchor_visualizer = VisualizationMarkers(
-                    self.cfg.anchor_visualizer_cfg.replace(prim_path="/Visuals/Command/current/anchor")
-                )
-                self.goal_anchor_visualizer = VisualizationMarkers(
-                    self.cfg.anchor_visualizer_cfg.replace(prim_path="/Visuals/Command/goal/anchor")
-                )
-
+                self.current_ref_body_visualizers = []
+                self.goal_ref_body_visualizers = []
                 self.current_body_visualizers = []
                 self.goal_body_visualizers = []
                 for name in self.cfg.body_names:
@@ -1110,31 +1107,42 @@ class MotionCommand(CommandTerm):
                             self.cfg.body_visualizer_cfg.replace(prim_path="/Visuals/Command/goal/" + name)
                         )
                     )
+                    self.current_ref_body_visualizers.append(
+                        VisualizationMarkers(
+                            self.cfg.ref_body_visualizer_cfg.replace(prim_path="/Visuals/Command/current/" + name)
+                        )
+                    )
+                    self.goal_ref_body_visualizers.append(
+                        VisualizationMarkers(
+                            self.cfg.ref_body_visualizer_cfg.replace(prim_path="/Visuals/Command/goal/" + name)
+                        )
+                    )
+                    
 
-            self.current_anchor_visualizer.set_visibility(True)
-            self.goal_anchor_visualizer.set_visibility(True)
             for i in range(len(self.cfg.body_names)):
                 self.current_body_visualizers[i].set_visibility(True)
                 self.goal_body_visualizers[i].set_visibility(True)
+                self.current_ref_body_visualizers[i].set_visibility(True)
+                self.goal_ref_body_visualizers[i].set_visibility(True)
 
         else:
             if hasattr(self, "current_anchor_visualizer"):
-                self.current_anchor_visualizer.set_visibility(False)
-                self.goal_anchor_visualizer.set_visibility(False)
                 for i in range(len(self.cfg.body_names)):
                     self.current_body_visualizers[i].set_visibility(False)
                     self.goal_body_visualizers[i].set_visibility(False)
+                    self.current_ref_body_visualizers[i].set_visibility(False)
+                    self.goal_ref_body_visualizers[i].set_visibility(False)
 
     def _debug_vis_callback(self, event):
         if not self.robot.is_initialized:
             return
 
-        self.current_anchor_visualizer.visualize(self.robot_anchor_pos_w, self.robot_anchor_quat_w)
-        self.goal_anchor_visualizer.visualize(self.anchor_pos_w, self.anchor_quat_w)
-
         for i in range(len(self.cfg.body_names)):
             self.current_body_visualizers[i].visualize(self.robot_body_pos_w[:, i], self.robot_body_quat_w[:, i])
             self.goal_body_visualizers[i].visualize(self.body_pos_relative_w[:, i], self.body_quat_relative_w[:, i])
+            
+            self.current_ref_body_visualizers[i].visualize(self.body_pos_w[:, i], self.body_quat_w[:, i])
+            self.goal_ref_body_visualizers[i].visualize(self.ref_body_pos_relative_w[:, i], self.ref_body_quat_relative_w[:, i])
             
 
 
@@ -1168,8 +1176,8 @@ class MotionCommandCfg(CommandTermCfg):
     adaptive_uniform_ratio: float = 0.1
     adaptive_alpha: float = 0.001
 
-    anchor_visualizer_cfg: VisualizationMarkersCfg = FRAME_MARKER_CFG.replace(prim_path="/Visuals/Command/pose")
-    anchor_visualizer_cfg.markers["frame"].scale = (0.2, 0.2, 0.2)
+    ref_body_visualizer_cfg: VisualizationMarkersCfg = FRAME_MARKER_CFG.replace(prim_path="/Visuals/Command/pose")
+    ref_body_visualizer_cfg.markers["frame"].scale = (0.2, 0.2, 0.2)
 
     body_visualizer_cfg: VisualizationMarkersCfg = FRAME_MARKER_CFG.replace(prim_path="/Visuals/Command/pose")
     body_visualizer_cfg.markers["frame"].scale = (0.1, 0.1, 0.1)

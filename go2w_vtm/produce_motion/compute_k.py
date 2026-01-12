@@ -10,7 +10,7 @@ from go2w_vtm.utils.mjcf_editor import MJCFEditor
 plugin_path = go2w_vtm.GO2W_MJCF_DIR + "/mj_plugin"
 mujoco.mj_loadAllPluginLibraries(plugin_path)
 
-file_path = go2w_vtm.GO2W_MJCF_DIR + "/mocap_scene_terrain_K.xml"
+file_path = go2w_vtm.GO2W_MJCF_DIR + "/mocap_scene_terrain.xml"
 
 # save_npz_path = go2w_vtm.GO2W_PRODUCE_MOTION_K_DIR + "/human_k.npz"
 save_xml_path = go2w_vtm.GO2W_MJCF_DIR + "/compute_k.xml"

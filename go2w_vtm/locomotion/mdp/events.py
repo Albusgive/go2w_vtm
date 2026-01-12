@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
     
 from go2w_vtm.locomotion.mdp import MotionCommand
+from go2w_vtm.terrains import ConfirmTerrainImporter
 
 
 def randomize_rigid_body_inertia(
@@ -260,11 +261,14 @@ def randomize_terrain_motion(
     env: ManagerBasedEnv,
     env_ids: torch.Tensor,
     command_name: str):
-    """Randomize the motion of the asset."""
+    """根据地形id选择motion."""
     command: MotionCommand = env.command_manager.get_term(command_name)
     if command.terrain_motion_table is None:
             return
-    terrain_ids = command.env_terrain_ids[env_ids]
+    terrain:ConfirmTerrainImporter = env.scene.terrain
+    terrain_ids =  terrain.get_sub_terrain_type(env_ids)
+    if terrain_ids is None:
+        return
     max_len = command.terrain_motion_table.shape[1]
     rand_idx = torch.randint(0, max_len, (len(env_ids),), device=command.device)
     command.motion_ids[env_ids] = command.terrain_motion_table[terrain_ids, rand_idx]

@@ -9,7 +9,7 @@ from ..mimic_env_cfg import RewardsCfg
 
 import go2w_vtm
 from go2w_vtm.Robot.go2w import UNITREE_GO2W_CFG,UNITREE_GO2W_NO_MOTOR_LIMIT_CFG
-from go2w_vtm.terrains.config.rough import MIMIC_GYM_TERRAIN_CFG
+from go2w_vtm.terrains.config.rough import MIMIC_GYM_TERRAIN_CFG,CONFIRM_TERRAIN_CFG
 
 from isaaclab.utils.noise import UniformNoiseCfg
 import os
@@ -95,7 +95,7 @@ class UnitreeGo2WMimicEnvCfg(MimicEnvCfg):
         self.scene.robot = UNITREE_GO2W_NO_MOTOR_LIMIT_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
         # ------------------------------Terrain------------------------------
         self.scene.terrain.terrain_type = "generator"
-        self.scene.terrain.terrain_generator = MIMIC_GYM_TERRAIN_CFG
+        self.scene.terrain.terrain_generator = CONFIRM_TERRAIN_CFG
         # ------------------------------commands------------------------------
         jump_path = os.path.join(go2w_vtm.MONTION_DIR, "jump.npz")
         leap1_path = os.path.join(go2w_vtm.MONTION_DIR, "leap1.npz")
@@ -103,16 +103,17 @@ class UnitreeGo2WMimicEnvCfg(MimicEnvCfg):
         leap3_path = os.path.join(go2w_vtm.MONTION_DIR, "leap3.npz")
         leap_k_path = os.path.join(go2w_vtm.MONTION_DIR, "leap_k.npz")
         climb_k_path = os.path.join(go2w_vtm.MONTION_DIR, "climb_k.npz")
-        # self.commands.motion.motion_files = {"leap_k": leap_k_path,"climb_k": climb_k_path}    #: dict[str, str]
-        self.commands.motion.motion_files = {"leap1": leap1_path}
+       
+        # self.commands.motion.motion_files = {"leap1": leap1_path}
+        self.commands.motion.motion_files = {"leap_k": leap_k_path,"climb_k": climb_k_path}    #: dict[str, str]
         self.commands.motion.anchor_body_name = "base"
         self.commands.motion.body_names = self.body_names
         self.commands.motion.joint_names = self.leg_joint_names
-        self.commands.motion.terrain_motion_map = {"mimic_trench":["leap1"],
-                                                   }
-        # self.commands.motion.terrain_motion_map = {"mimic_trench":["leap_k"],
-        #                                            "mimic_high_platform":["climb_k"]
+        # self.commands.motion.terrain_motion_map = {"mimic_trench":["leap1"],
         #                                            }
+        self.commands.motion.terrain_motion_map = {"mimic_trench":["leap_k"],
+                                                   "mimic_high_platform":["climb_k"]
+                                                   }
         # ------------------------------Observations------------------------------
         self.observations.policy.joint_pos.func = mdp.joint_pos_rel
         self.observations.policy.joint_pos.params["asset_cfg"] = SceneEntityCfg(
@@ -142,10 +143,10 @@ class UnitreeGo2WMimicEnvCfg(MimicEnvCfg):
         self.events.randomize_com_positions.params["asset_cfg"].body_names = [self.base_link_name]
         # ------------------------------Rewards------------------------------
         self.rewards.action_rate_l2.weight = -1e-2
-        self.rewards.motion_body_pos.weight = 2.0
-        self.rewards.motion_body_lin_vel.weight = 2.0
-        self.rewards.motion_global_anchor_pos.weight = 4.0
-        
+        self.rewards.motion_body_pos.weight = 3.0
+        self.rewards.motion_body_lin_vel.weight = 3.0
+        self.rewards.motion_global_anchor_pos.weight = 5.0
+
         # 取消轮子body的姿态和角速度rew
         self.rewards.motion_body_pos.params["body_names"] = self.body_names
         self.rewards.motion_body_ori.params["body_names"] = self.body_names[:-4]

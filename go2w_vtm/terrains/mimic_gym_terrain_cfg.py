@@ -23,6 +23,13 @@ class MimicTrenchTerrainCfg(HfTerrainBaseCfg):
     mjcf_path: str = None
     save_name: str = "trench_terrain"
     
+@configclass
+class BoxTerrainCfg(SubTerrainBaseCfg):
+    save_to_mjcf: bool = False
+    mesh_path: str = None
+    mjcf_path: str = None
+    save_name: str = "trench_box_terrain"
+    
 
 @configclass
 class MimicFixBoxTerrainCfg(SubTerrainBaseCfg):
@@ -35,6 +42,25 @@ class MimicFixBoxTerrainCfg(SubTerrainBaseCfg):
     high_platform_half_width: list[float] = MISSING                       
     high_platform_half_height: list[float] = MISSING  
     
+    robot_origin_x: float = 1.5
+    
+    save_to_mjcf: bool = False
+    mesh_path: str = None
+    mjcf_path: str = None
+    save_name: str = "trench_box_terrain"
+    
+
+@configclass
+class BoxTrenchTerrainCfg(BoxTerrainCfg):
+    ''' 两块box '''
+    function = mimic_gym_terrain.box_trench_terrain
+    
+    ''' 在机器人面前 trench_x位置为沟壑边缘 宽度为trench_width'''
+    trench_x: list[float] = MISSING                                   
+    trench_width: tuple[float, float] = MISSING  
+    trench_depth: float = MISSING
+    
+    ''' 机器人x坐标 '''
     robot_origin_x: float = 1.5
     
     save_to_mjcf: bool = False

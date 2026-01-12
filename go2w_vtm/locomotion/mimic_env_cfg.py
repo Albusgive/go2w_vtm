@@ -29,6 +29,7 @@ import go2w_vtm.locomotion.mdp as mdp
 ##
 from isaaclab.terrains.config.rough import ROUGH_TERRAINS_CFG
 from go2w_vtm.terrains.config.rough import GO2W_ROUGH_TERRAINS_CFG
+from go2w_vtm.terrains import ConfirmTerrainImporterCfg
 
 ##
 # Scene definition
@@ -48,7 +49,7 @@ class MySceneCfg(InteractiveSceneCfg):
     """Configuration for the terrain scene with a legged robot."""
 
     # ground terrain
-    terrain = TerrainImporterCfg(
+    terrain = ConfirmTerrainImporterCfg(
         prim_path="/World/ground",
         terrain_type="plane",
         max_init_terrain_level=5,
@@ -321,7 +322,7 @@ class TerminationsCfg:
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
     anchor_pos = DoneTerm(
         func=mdp.bad_anchor_pos_z_only,
-        params={"command_name": "motion", "threshold": 0.5},
+        params={"command_name": "motion", "threshold": 0.2},
     )
     anchor_ori = DoneTerm(
         func=mdp.bad_anchor_ori,

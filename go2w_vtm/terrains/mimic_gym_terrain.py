@@ -116,6 +116,46 @@ def create_mujoco_box_mesh(
     return box
 
 
+def box_trench_terrain(difficulty: float, cfg: mimic_gym_terrain_cfg.BoxTrenchTerrainCfg) -> np.ndarray:
+    """
+    生成两块box
+    """
+    #计算沟壑宽度 trench_width range*difficulty
+    trench_width = cfg.trench_width[0] + (cfg.trench_width[1] - cfg.trench_width[0]) * difficulty
+    box1_x_width = cfg.trench_x+cfg.robot_origin_x
+    trench_x_max = box1_x_width + trench_width
+    if cfg.size[0] < trench_x_max:
+        raise ValueError("trench_x + trench_width must be less than size[0].")
+    
+    # 初始化网格列表
+    meshes_list = []
+    
+    # -- 定义机器人出生点 --
+    terrain_center = np.array([0.5 * cfg.size[0], 0.5 * cfg.size[1]])
+    origin = np.array([cfg.robot_origin_x, terrain_center[1], 0.05]) # 稍高于平台
+
+    box1_extents = [box1_x_width, cfg.size[1], cfg.trench_depth]
+    box1_center_pos = [box1_extents[0]/2, cfg.size[1]/2, -box1_extents[2]/2]
+    box1 = trimesh.creation.box(extents=box1_extents)
+    box1.apply_translation(box1_center_pos)
+    meshes_list.append(box1)
+    
+    
+    box2_extents = [cfg.size[0]-trench_x_max, cfg.size[1], cfg.trench_depth]
+    box2_center_pos = [box2_extents[0]/2+trench_x_max, cfg.size[1]/2, -box2_extents[2]/2]
+    box2 = trimesh.creation.box(extents=box2_extents)
+    box2.apply_translation(box2_center_pos)
+    meshes_list.append(box2)
+    
+    if cfg.save_to_mjcf:
+        save_terrain_as_mjcf_with_stl(meshes_list=meshes_list,
+                            origin=origin,output_path=cfg.mjcf_path,
+                            filename=cfg.save_name,mesh_output_dir=cfg.mesh_path)
+        
+
+    return meshes_list, origin
+
+
 def fix_box_terrain(difficulty: float, cfg: mimic_gym_terrain_cfg.MimicFixBoxTerrainCfg) -> np.ndarray:
     """
     高台只能使用box,如果修改高度场就会出现初始z为最高位置

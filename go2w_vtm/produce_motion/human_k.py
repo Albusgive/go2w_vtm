@@ -36,7 +36,7 @@ cfg.orientation_cost = 0.6
 
 plk = IK_and_savekey.PlanningKeyframe(temp_k_path,cfg,True) # mink
 
-# 自定义内容
+# 自定义内容 TODO  compute_k 根据TEXT内容自动生成对应的key
 id = mujoco.mj_name2id(plk.model,mujoco.mjtObj.mjOBJ_TEXT,"custom2")
 custom = plk.model.text_data[plk.model.text_adr[id]:plk.model.text_adr[id]+plk.model.text_size[id]-1]
 
