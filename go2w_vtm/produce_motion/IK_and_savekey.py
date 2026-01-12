@@ -49,8 +49,11 @@ class mink_cfg(ik_cfg):
         
         
 class PlanningKeyframe:
-    def __init__(self,file_path:str,cfg:ik_cfg,editing:bool=False):
-        self.model = mujoco.MjModel.from_xml_path(file_path)
+    def __init__(self,mjcf:str,cfg:ik_cfg,editing:bool=False):
+        if mjcf[-4:] != ".xml":
+            self.model = mujoco.MjModel.from_xml_string(mjcf)
+        else:
+            self.model = mujoco.MjModel.from_xml_path(mjcf)
         self.anchor_ref_body_mids = [self.model.body(site).mocapid[0] for site in cfg.anchor_ref]
         self.anchor_body_ids = [self.model.site_bodyid[mujoco.mj_name2id(self.model,mujoco.mjtObj.mjOBJ_SITE,anchor)] for anchor in cfg.anchor]
         self.anchor_ref_site_ids = [mujoco.mj_name2id(self.model,mujoco.mjtObj.mjOBJ_SITE,anchor_ref) for anchor_ref in cfg.anchor_ref]

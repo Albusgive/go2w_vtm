@@ -125,20 +125,20 @@ MIMIC_GYM_TERRAIN_CFG = TerrainGeneratorCfg(
             mjcf_path = go2w_vtm.GO2W_MJCF_DIR,
             save_name = "trench_box_terrain"
         ),
-        "mimic_high_platform": terrain_gen.MimicFixBoxTerrainCfg(
-            # proportion=0.5,
+        # "mimic_high_platform": terrain_gen.MimicFixBoxTerrainCfg(
+        #     # proportion=0.5,
             
-            high_platform_x=[0.0,1.5],  
-            high_platform_z=[-0.5,0.0],      
-            high_platform_half_width=[0.75,0.75],
-            high_platform_half_height=[0.5,0.4],
+        #     high_platform_x=[0.0,1.5],  
+        #     high_platform_z=[-0.5,0.0],      
+        #     high_platform_half_width=[0.75,0.75],
+        #     high_platform_half_height=[0.5,0.4],
             
-            robot_origin_x = 0.8,
+        #     robot_origin_x = 0.8,
             
-            save_to_mjcf = True,
-            mesh_path = go2w_vtm.GO2W_MJCF_DIR + "/meshs/",
-            mjcf_path = go2w_vtm.GO2W_MJCF_DIR,
-            save_name = "high_platform"
-        ),
+        #     save_to_mjcf = True,
+        #     mesh_path = go2w_vtm.GO2W_MJCF_DIR + "/meshs/",
+        #     mjcf_path = go2w_vtm.GO2W_MJCF_DIR,
+        #     save_name = "high_platform"
+        # ),
     }
 )

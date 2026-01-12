@@ -2,7 +2,7 @@
     <include file="go2w_mocap.xml" />
     <!-- <include file="go2w_ray_caster.xml" /> -->
 
-    <include file="high_platform.xml" />
+    <!-- <include file="high_platform.xml" /> -->
     <!-- <include file="trench_box_terrain.xml"/> -->
 
     <!-- <include file="mocap_act.xml" /> -->
@@ -38,5 +38,9 @@
         <replicate count="30" offset="0.1 0 0">
             <site size="0.02" rgba="1 0 0 .5" />
         </replicate>
+
+
     </worldbody>
+
+     
 </mujoco>

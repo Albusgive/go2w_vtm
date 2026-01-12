@@ -5,6 +5,8 @@ import mujoco.viewer
 import glfw
 
 import mujoco
+from go2w_vtm.utils.mjcf_editor import MJCFEditor
+
 plugin_path = go2w_vtm.GO2W_MJCF_DIR + "/mj_plugin"
 mujoco.mj_loadAllPluginLibraries(plugin_path)
 

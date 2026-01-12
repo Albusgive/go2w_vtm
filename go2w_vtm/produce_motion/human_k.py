@@ -5,32 +5,41 @@ import mujoco.viewer
 import glfw
 
 import mujoco
-plugin_path = go2w_vtm.GO2W_MJCF_DIR + "/mj_plugin"
-mujoco.mj_loadAllPluginLibraries(plugin_path)
+from go2w_vtm.utils.mjcf_editor import MJCFEditor
+
+# plugin_path = go2w_vtm.GO2W_MJCF_DIR + "/mj_plugin"
+# mujoco.mj_loadAllPluginLibraries(plugin_path)
 
 
-file_path = go2w_vtm.GO2W_MJCF_DIR + "/mocap_scene_terrain.xml"
-file_path2 = go2w_vtm.GO2W_MJCF_DIR + "/mocap_pd_scene.xml"
-
-# save_npz_path = go2w_vtm.GO2W_PRODUCE_MOTION_K_DIR + "/human_k.npz"
+file_path = go2w_vtm.GO2W_MJCF_DIR + "/go2w_mocap.xml"
+terrain_path = go2w_vtm.GO2W_MJCF_DIR + "/high_platform.xml"
 save_xml_path = go2w_vtm.GO2W_MJCF_DIR + "/human_k2.xml"
+temp_k_path = go2w_vtm.GO2W_MJCF_DIR + "/temp_k.xml"
+
+mjcf = MJCFEditor(file_path)
+mjcf.add_sub_element("worldbody", "light", attrib={"pos": "0 0 1.5","dir": "0 0 -1","directional":"true",})
+mjcf.add_sub_element("worldbody", "light", attrib={"pos": "-1.5 0 1.5","dir": "1 0 -1","directional":"true",})
+mjcf.add_sub_element("mujoco", "include", attrib={"file": terrain_path})
+
+mjcf.add_sub_element("mujoco", "custom")
+mjcf.add_sub_element("custom", "text", attrib={"name": "custom", "data": "aabb"})
+mjcf.add_sub_element("custom", "text", attrib={"name": "custom2", "data": "bbcc"})
+
+mjcf.save(temp_k_path)
+mjcf.add_sub_element("mujoco", "include", attrib={"file": save_xml_path})
 
 anchor = ["FL_foot_joint", "FR_foot_joint", "RR_foot_joint", "RL_foot_joint"]
 anchor_ref = [ref+"_ref" for ref in anchor]
 
 cfg = IK_and_savekey.mink_cfg("base_link",anchor,anchor_ref)
 cfg.orientation_cost = 0.6
-cfg2 = IK_and_savekey.mujoco_position_cfg("base_link",anchor,anchor_ref)
-cfg3 = IK_and_savekey.mujoco_pid_cfg("base_link",anchor,anchor_ref)
-cfg3.kp = 1000.0
-cfg3.kd = 10.0
-cfg3.ki = 1.0
-cfg3.i_max = 1000.0
-cfg3.force_limit = 1000
 
-plk = IK_and_savekey.PlanningKeyframe(file_path,cfg,True) # mink
-# plk = planning_keyframe.PlanningKeyframe(file_path2,cfg2) # mujoco pd
-# plk = planning_keyframe.PlanningKeyframe(file_path,cfg3) # self pid
+plk = IK_and_savekey.PlanningKeyframe(temp_k_path,cfg,True) # mink
+
+# 自定义内容
+id = mujoco.mj_name2id(plk.model,mujoco.mjtObj.mjOBJ_TEXT,"custom2")
+custom = plk.model.text_data[plk.model.text_adr[id]:plk.model.text_adr[id]+plk.model.text_size[id]-1]
+
 
 frame_time = 0.0
 def key_callback(key:int):
@@ -41,6 +50,7 @@ def key_callback(key:int):
     if key == glfw.KEY_SPACE:
         # plk.save_qpos(save_npz_path)
         plk.save_keyframe(save_xml_path)
+        mjcf.save(temp_k_path)
     if key == glfw.KEY_BACKSPACE:
         plk.reset_world()
 
