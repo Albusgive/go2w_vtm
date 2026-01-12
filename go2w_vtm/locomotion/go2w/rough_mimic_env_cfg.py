@@ -70,6 +70,10 @@ class UnitreeGo2WMimicEnvCfg(MimicEnvCfg):
         "FR_foot", "FL_foot", "RR_foot", "RL_foot",
     ]
     collection_leg_names = ["base", "FR_foot", "FL_foot", "RR_foot", "RL_foot"]
+    body_names = [
+            'base', 'FL_hip', 'FR_hip', 'RL_hip', 'RR_hip', 'FL_thigh', 'FR_thigh', 'RL_thigh', 'RR_thigh', 
+            'FL_calf', 'FR_calf', 'RL_calf', 'RR_calf', 'FL_foot', 'FR_foot', 'RL_foot', 'RR_foot'
+        ]
     
     low_joint_pos={
             ".*L_hip_joint": 0.0,
@@ -102,10 +106,7 @@ class UnitreeGo2WMimicEnvCfg(MimicEnvCfg):
         # self.commands.motion.motion_files = {"leap_k": leap_k_path,"climb_k": climb_k_path}    #: dict[str, str]
         self.commands.motion.motion_files = {"leap1": leap1_path}
         self.commands.motion.anchor_body_name = "base"
-        self.commands.motion.body_names = [
-            'base', 'FL_hip', 'FR_hip', 'RL_hip', 'RR_hip', 'FL_thigh', 'FR_thigh', 'RL_thigh', 'RR_thigh', 
-            'FL_calf', 'FR_calf', 'RL_calf', 'RR_calf', 'FL_foot', 'FR_foot', 'RL_foot', 'RR_foot'
-        ]
+        self.commands.motion.body_names = self.body_names
         self.commands.motion.joint_pos_names = self.leg_joint_names
         self.commands.motion.terrain_motion_map = {"mimic_trench":["leap1"],
                                                    }
@@ -144,6 +145,12 @@ class UnitreeGo2WMimicEnvCfg(MimicEnvCfg):
         self.rewards.motion_body_pos.weight = 2.0
         self.rewards.motion_body_lin_vel.weight = 2.0
         self.rewards.motion_global_anchor_pos.weight = 4.0
+        
+        # 取消轮子body的姿态和角速度rew
+        self.rewards.motion_body_pos.params["body_names"] = self.body_names
+        self.rewards.motion_body_ori.params["body_names"] = self.body_names[:-4]
+        self.rewards.motion_body_lin_vel.params["body_names"] = self.body_names
+        self.rewards.motion_body_ang_vel.params["body_names"] = self.body_names[:-4]
 
         # If the weight of rewards is 0, set rewards to None
         if self.__class__.__name__ == "UnitreeGo2WMimicEnvCfg":

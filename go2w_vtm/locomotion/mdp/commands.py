@@ -1150,6 +1150,7 @@ class MotionCommandCfg(CommandTermCfg):
     
     anchor_body_name: str = MISSING
     body_names: list[str] = MISSING
+    
     joint_pos_names: list[str] = None
     
     is_play_mode :bool = False
