@@ -737,8 +737,8 @@ class MotionCommand(CommandTerm):
         self.metrics["sampling_top1_prob"] = torch.zeros(self.num_envs, device=self.device)
         self.metrics["sampling_top1_bin"] = torch.zeros(self.num_envs, device=self.device)
         
-        if self.cfg.joint_pos_names is not None:
-            self.joint_indexes = self.robot.find_joints(self.cfg.joint_pos_names, preserve_order=True)[0]
+        if self.cfg.joint_names is not None:
+            self.joint_indexes = self.robot.find_joints(self.cfg.joint_names, preserve_order=True)[0]
             self.joint_indexes = torch.tensor(self.joint_indexes, dtype=torch.long, device=self.device)
             
         # 构建地形 -> motion_id 的映射表
@@ -797,7 +797,7 @@ class MotionCommand(CommandTerm):
     
     @property
     def command(self) -> torch.Tensor:
-        if self.cfg.joint_pos_names is not None:
+        if self.cfg.joint_names is not None:
             raw = torch.cat([self.joint_pos[:,self.joint_indexes], self.joint_vel[:,self.joint_indexes]], dim=1)
         else:
             raw = torch.cat([self.joint_pos, self.joint_vel], dim=1)
@@ -1151,7 +1151,7 @@ class MotionCommandCfg(CommandTermCfg):
     anchor_body_name: str = MISSING
     body_names: list[str] = MISSING
     
-    joint_pos_names: list[str] = None
+    joint_names: list[str] = None
     
     is_play_mode :bool = False
 

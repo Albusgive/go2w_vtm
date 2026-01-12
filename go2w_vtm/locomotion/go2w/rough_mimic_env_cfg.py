@@ -107,7 +107,7 @@ class UnitreeGo2WMimicEnvCfg(MimicEnvCfg):
         self.commands.motion.motion_files = {"leap1": leap1_path}
         self.commands.motion.anchor_body_name = "base"
         self.commands.motion.body_names = self.body_names
-        self.commands.motion.joint_pos_names = self.leg_joint_names
+        self.commands.motion.joint_names = self.leg_joint_names
         self.commands.motion.terrain_motion_map = {"mimic_trench":["leap1"],
                                                    }
         # self.commands.motion.terrain_motion_map = {"mimic_trench":["leap_k"],
