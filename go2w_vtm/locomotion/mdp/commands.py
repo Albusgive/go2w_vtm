@@ -743,7 +743,7 @@ class MotionCommand(CommandTerm):
             self.joint_indexes = self.robot.find_joints(self.cfg.joint_names, preserve_order=True)[0]
             self.joint_indexes = torch.tensor(self.joint_indexes, dtype=torch.long, device=self.device)
         
-        self.velocity = torch.zeros(self.num_envs, 3, device=self.device) # obs cmd
+        self._velocity_command = torch.zeros(self.num_envs, 3, device=self.device)
             
         self.terrain = self._env.scene.terrain
         if isinstance(self.terrain, ConfirmTerrainImporter):
@@ -815,8 +815,16 @@ class MotionCommand(CommandTerm):
             torch.zeros_like(raw))
         
     @property
-    def command_and_vel(self) -> torch.Tensor:
-        return torch.cat([self.command, self.velocity], dim=1)
+    def velocity_command(self) -> torch.Tensor:
+        ''' 根据anchor 的速度和角速度计算cmd (vx, vy, ωz)'''
+        return torch.where(
+            self.enable.unsqueeze(-1),
+            self._velocity_command,
+            torch.zeros_like(self._velocity_command))
+        
+    @property
+    def command_with_vel(self) -> torch.Tensor:
+        return torch.cat([self.command, self.velocity_command], dim=1)
     
     @property
     def joint_pos(self) -> torch.Tensor:
@@ -898,15 +906,29 @@ class MotionCommand(CommandTerm):
     def robot_anchor_ang_vel_w(self) -> torch.Tensor:
         return self.robot.data.body_ang_vel_w[:, self.robot_anchor_body_index]
     
-    def anchor_lin_vel_local(self):
+    def _update_velocity_command(self):
         """
-        计算指定环境的 anchor 线速度在 anchor 局部坐标系下的表示，并更新 self.velocity。
+        从 motion 数据中提取 anchor 的 (vx, vy, ωz) 命令，并更新 self._velocity_command。
+        
+        - vx, vy: anchor 局部坐标系下的线速度（x/y 分量）
+        - ωz: 绕世界 Z 轴的角速度（等价于局部 z，若无 roll/pitch）
         """
-        # 获取这些环境的世界系 anchor 线速度
-        vel_w = self.anchor_lin_vel_w         # [E, 3]
-        quat_w = self.anchor_quat_w           # [E, 4]
-        # 转换到局部坐标系: v_local = R(quat_w)^T @ v_w
-        self.velocity = quat_rotate_inverse(quat_w, vel_w)  # [E, 3]
+        # 1. 获取 world 系下的线速度和角速度
+        lin_vel_w = self.anchor_lin_vel_w      # [E, 3]
+        ang_vel_w = self.anchor_ang_vel_w      # [E, 3]
+        # 2. 获取 anchor 的朝向（用于将线速度转到局部系）
+        quat_w = self.anchor_quat_w          # [E, 4]
+        # 3. 将线速度转到 anchor 局部坐标系
+        lin_vel_local = quat_rotate_inverse(quat_w, lin_vel_w)  # [E, 3]
+        # 4. 提取 vx, vy（局部 x, y）
+        vx = lin_vel_local[:, 0]
+        vy = lin_vel_local[:, 1]
+        # 5. 提取 ωz（世界系 z 分量，通常更稳定；也可用局部 z）
+        wz = ang_vel_w[:, 2]  # 绕世界 Z 轴的角速度
+        # 6. 更新缓存
+        self._velocity_command[:, 0] = vx
+        self._velocity_command[:, 1] = vy
+        self._velocity_command[:, 2] = wz
 
     def _update_metrics(self):
         self.metrics["error_anchor_pos"] = torch.norm(self.anchor_pos_w - self.robot_anchor_pos_w, dim=-1)

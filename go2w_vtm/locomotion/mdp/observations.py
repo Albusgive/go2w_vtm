@@ -277,4 +277,10 @@ def motion_anchor_ori_b(env: ManagerBasedEnv, command_name: str) -> torch.Tensor
 def motion_commands_and_vel(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     """The motion command from command term in the command manager with the given name."""
     command: MotionCommand = env.command_manager.get_term(command_name)
-    return command.command_and_vel
+    return command.command_with_vel
+
+
+def motion_velocity_command(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    """The motion command from command term in the command manager with the given name."""
+    command: MotionCommand = env.command_manager.get_term(command_name)
+    return command.velocity_command
