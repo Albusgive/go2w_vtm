@@ -558,7 +558,7 @@ from isaaclab.utils.math import (
     quat_mul,
     sample_uniform,
     yaw_quat,
-    quat_rotate_inverse
+    quat_apply_inverse
 )
 from torch.nn.utils.rnn import pad_sequence
 from go2w_vtm.terrains import ConfirmTerrainImporter
@@ -919,7 +919,7 @@ class MotionCommand(CommandTerm):
         # 2. 获取 anchor 的朝向（用于将线速度转到局部系）
         quat_w = self.anchor_quat_w          # [E, 4]
         # 3. 将线速度转到 anchor 局部坐标系
-        lin_vel_local = quat_rotate_inverse(quat_w, lin_vel_w)  # [E, 3]
+        lin_vel_local = quat_apply_inverse(quat_w, lin_vel_w)  # [E, 3]
         # 4. 提取 vx, vy（局部 x, y）
         vx = lin_vel_local[:, 0]
         vy = lin_vel_local[:, 1]
@@ -1191,7 +1191,7 @@ class MotionCommand(CommandTerm):
         anchor_pos_w[:, 2] += 0.5
         # -- resolve the scales and quaternions
         vel_des_arrow_scale, vel_des_arrow_quat = self._resolve_xy_velocity_to_arrow(self.velocity_command[:, :2])
-        robot_anchor_lin_vel_b = quat_rotate_inverse(self.robot_anchor_quat_w, self.robot_anchor_lin_vel_w)
+        robot_anchor_lin_vel_b = quat_apply_inverse(self.robot_anchor_quat_w, self.robot_anchor_lin_vel_w)
         vel_arrow_scale, vel_arrow_quat = self._resolve_xy_velocity_to_arrow(robot_anchor_lin_vel_b[:, :2])
         # display markers
         self.goal_vel_visualizer.visualize(anchor_pos_w, vel_des_arrow_quat, vel_des_arrow_scale)
