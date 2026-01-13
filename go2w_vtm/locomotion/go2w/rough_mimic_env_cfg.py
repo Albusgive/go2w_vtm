@@ -9,7 +9,7 @@ from ..mimic_env_cfg import RewardsCfg
 
 import go2w_vtm
 from go2w_vtm.Robot.go2w import UNITREE_GO2W_CFG,UNITREE_GO2W_NO_MOTOR_LIMIT_CFG
-from go2w_vtm.terrains.config.rough import MIMIC_GYM_TERRAIN_CFG,CONFIRM_TERRAIN_CFG
+from go2w_vtm.terrains.config.rough import MIMIC_GYM_TERRAIN_CFG,CONFIRM_TERRAIN_CFG,CONFIRM_TERRAIN_CFG2
 
 from isaaclab.utils.noise import UniformNoiseCfg
 import os
@@ -104,16 +104,19 @@ class UnitreeGo2WMimicEnvCfg(MimicEnvCfg):
         leap_k_path = os.path.join(go2w_vtm.MONTION_DIR, "leap_k.npz")
         climb_k_path = os.path.join(go2w_vtm.MONTION_DIR, "climb_k.npz")
        
-        # self.commands.motion.motion_files = {"leap1": leap1_path}
-        self.commands.motion.motion_files = {"leap_k": leap_k_path,"climb_k": climb_k_path}    #: dict[str, str]
+        # self.commands.motion.motion_files = {"leap_k": leap_k_path}
+        self.commands.motion.motion_files = {"jump": jump_path,"leap_k": leap_k_path,"climb_k": climb_k_path}    #: dict[str, str]
         self.commands.motion.anchor_body_name = "base"
         self.commands.motion.body_names = self.body_names
         self.commands.motion.joint_names = self.leg_joint_names
-        # self.commands.motion.terrain_motion_map = {"mimic_trench":["leap1"],
-        #                                            }
-        self.commands.motion.terrain_motion_map = {"mimic_trench":["leap_k"],
-                                                   "mimic_high_platform":["climb_k"]
+        self.commands.motion.terrain_motion_map = {
+                                                    "mimic_trench":["jump"],
+                                                    "mimic_high_platform":["jump"]
                                                    }
+        # self.commands.motion.terrain_motion_map = {
+        #                                             "mimic_trench":["leap_k"],
+        #                                             "mimic_high_platform":["climb_k"]
+        #                                            }
         # ------------------------------Observations------------------------------
         self.observations.policy.joint_pos.func = mdp.joint_pos_rel
         self.observations.policy.joint_pos.params["asset_cfg"] = SceneEntityCfg(

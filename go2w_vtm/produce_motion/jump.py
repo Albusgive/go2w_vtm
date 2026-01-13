@@ -16,7 +16,7 @@ d = mujoco.MjData(m)
 key_frame = KeyFrame()
 key_frame.setRecordBody(m,'base_link')
 key_frame.set_record_fps(30)
-key_frame.setSaveFields(act=False,ctrl=False)
+key_frame.setSaveFields(qpos=True,qvel=True)
 
 
 actuators=["FL_wheel_z","FR_wheel_z","FL_wheel_x","FR_wheel_x",

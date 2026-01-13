@@ -27,9 +27,9 @@
   <!-- <include file="high_platform.xml" /> -->
 
   <!-- motion -->
-   <!-- <include file="go2w_jump.xml" /> -->
+   <include file="go2w_jump.xml" />
   <!-- <include file="go2w_leap1.xml" /> -->
   <!-- <include file="human_k.xml" /> -->
-   <include file="compute_k.xml" />
+   <!-- <include file="compute_k.xml" /> -->
    <!-- <include file="compute_k2.xml" /> -->
 </mujoco>
