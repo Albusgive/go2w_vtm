@@ -712,9 +712,6 @@ class MotionCommand(CommandTerm):
         self.enable = torch.ones(self.num_envs, dtype=torch.bool, device=self.device)  #对于不进行mimic的环境给False
         
         self.time_steps = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
-        self.ref_body_pos_relative_w = torch.zeros(self.num_envs, len(cfg.body_names), 3, device=self.device)
-        self.ref_body_quat_relative_w = torch.zeros(self.num_envs, len(cfg.body_names), 4, device=self.device)
-        self.ref_body_quat_relative_w[:, :, 0] = 1.0
         self.body_pos_relative_w = torch.zeros(self.num_envs, len(cfg.body_names), 3, device=self.device)
         self.body_quat_relative_w = torch.zeros(self.num_envs, len(cfg.body_names), 4, device=self.device)
         self.body_quat_relative_w[:, :, 0] = 1.0
@@ -901,14 +898,6 @@ class MotionCommand(CommandTerm):
         self.metrics["error_anchor_lin_vel"] = torch.norm(self.anchor_lin_vel_w - self.robot_anchor_lin_vel_w, dim=-1)
         self.metrics["error_anchor_ang_vel"] = torch.norm(self.anchor_ang_vel_w - self.robot_anchor_ang_vel_w, dim=-1)
         
-        self.metrics["error_ref_body_pos"] = torch.norm(self.ref_body_pos_relative_w - self.body_pos_w, dim=-1).mean(
-            dim=-1
-        )
-        self.metrics["error_ref_body_rot"] = quat_error_magnitude(self.ref_body_quat_relative_w, self.body_quat_w).mean(
-            dim=-1
-        )
-        
-
         self.metrics["error_body_pos"] = torch.norm(self.body_pos_relative_w - self.robot_body_pos_w, dim=-1).mean(
             dim=-1
         )
@@ -1052,9 +1041,21 @@ class MotionCommand(CommandTerm):
         env_ids = torch.where(self.time_steps >= max_steps)[0]
         self._resample_command(env_ids)
 
-        # --- Rest of relative transform logic unchanged ---
         anchor_pos_w_repeat = self.anchor_pos_w[:, None, :].repeat(1, len(self.cfg.body_names), 1)
-        # ... same as before ...
+        anchor_quat_w_repeat = self.anchor_quat_w[:, None, :].repeat(1, len(self.cfg.body_names), 1)
+        robot_anchor_pos_w_repeat = self.robot_anchor_pos_w[:, None, :].repeat(1, len(self.cfg.body_names), 1)
+        robot_anchor_quat_w_repeat = self.robot_anchor_quat_w[:, None, :].repeat(1, len(self.cfg.body_names), 1)
+
+        delta_pos_w = robot_anchor_pos_w_repeat
+        delta_pos_w[..., 2] = anchor_pos_w_repeat[..., 2]
+        delta_ori_w = yaw_quat(quat_mul(robot_anchor_quat_w_repeat, quat_inv(anchor_quat_w_repeat)))
+
+        self.body_quat_relative_w = quat_mul(delta_ori_w, self.body_quat_w)
+        self.body_pos_relative_w = delta_pos_w + quat_apply(delta_ori_w, self.body_pos_w - anchor_pos_w_repeat)
+
+        self.bin_failed_count = (
+            self.cfg.adaptive_alpha * self._current_bin_failed + (1 - self.cfg.adaptive_alpha) * self.bin_failed_count
+        )
 
         # Update bin_failed_count with exponential moving average
         self.bin_failed_count = (
@@ -1093,7 +1094,6 @@ class MotionCommand(CommandTerm):
         if debug_vis:
             if not hasattr(self, "current_anchor_visualizer"):
                 self.current_ref_body_visualizers = []
-                self.goal_ref_body_visualizers = []
                 self.current_body_visualizers = []
                 self.goal_body_visualizers = []
                 for name in self.cfg.body_names:
@@ -1112,18 +1112,12 @@ class MotionCommand(CommandTerm):
                             self.cfg.ref_body_visualizer_cfg.replace(prim_path="/Visuals/Command/current/" + name)
                         )
                     )
-                    self.goal_ref_body_visualizers.append(
-                        VisualizationMarkers(
-                            self.cfg.ref_body_visualizer_cfg.replace(prim_path="/Visuals/Command/goal/" + name)
-                        )
-                    )
                     
 
             for i in range(len(self.cfg.body_names)):
                 self.current_body_visualizers[i].set_visibility(True)
                 self.goal_body_visualizers[i].set_visibility(True)
                 self.current_ref_body_visualizers[i].set_visibility(True)
-                self.goal_ref_body_visualizers[i].set_visibility(True)
 
         else:
             if hasattr(self, "current_anchor_visualizer"):
@@ -1131,7 +1125,6 @@ class MotionCommand(CommandTerm):
                     self.current_body_visualizers[i].set_visibility(False)
                     self.goal_body_visualizers[i].set_visibility(False)
                     self.current_ref_body_visualizers[i].set_visibility(False)
-                    self.goal_ref_body_visualizers[i].set_visibility(False)
 
     def _debug_vis_callback(self, event):
         if not self.robot.is_initialized:
@@ -1140,9 +1133,7 @@ class MotionCommand(CommandTerm):
         for i in range(len(self.cfg.body_names)):
             self.current_body_visualizers[i].visualize(self.robot_body_pos_w[:, i], self.robot_body_quat_w[:, i])
             self.goal_body_visualizers[i].visualize(self.body_pos_relative_w[:, i], self.body_quat_relative_w[:, i])
-            
             self.current_ref_body_visualizers[i].visualize(self.body_pos_w[:, i], self.body_quat_w[:, i])
-            self.goal_ref_body_visualizers[i].visualize(self.ref_body_pos_relative_w[:, i], self.ref_body_quat_relative_w[:, i])
             
 
 
@@ -1159,7 +1150,7 @@ class MotionCommandCfg(CommandTermCfg):
     anchor_body_name: str = MISSING
     body_names: list[str] = MISSING
     
-    joint_names: list[str] = None
+    joint_names: list[str] = None # cmd观测的motion的joint名称
     
     is_play_mode :bool = False
 

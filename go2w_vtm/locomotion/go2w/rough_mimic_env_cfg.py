@@ -146,9 +146,9 @@ class UnitreeGo2WMimicEnvCfg(MimicEnvCfg):
         self.events.randomize_com_positions.params["asset_cfg"].body_names = [self.base_link_name]
         # ------------------------------Rewards------------------------------
         self.rewards.action_rate_l2.weight = -1e-2
-        self.rewards.motion_body_pos.weight = 3.0
-        self.rewards.motion_body_lin_vel.weight = 3.0
-        self.rewards.motion_global_anchor_pos.weight = 5.0
+        self.rewards.motion_body_pos.weight = 2.0
+        self.rewards.motion_body_lin_vel.weight = 2.0
+        self.rewards.motion_global_anchor_pos.weight = 4.0
 
         # 取消轮子body的姿态和角速度rew
         self.rewards.motion_body_pos.params["body_names"] = self.body_names

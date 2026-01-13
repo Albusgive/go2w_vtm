@@ -328,20 +328,19 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
                 "body_ang_vel_w",
             ):
                 log[k] = np.stack(log[k], axis=0)
+             # --- 新增：保存 body 和 joint 的名称与 ID ---
+            # Body info
+            body_names = robot.data.body_names  # list[str]
+            joint_names = robot.data.joint_names  # list[str]
+            # Add to log
+            log["body_names"] = np.array(body_names, dtype="U32")  # Unicode string array
+            log["joint_names"] = np.array(joint_names, dtype="U32")
+            # --------------------------------------------------
             
             save_path = os.path.join(go2w_vtm.MONTION_DIR, args_cli.motion_name)+".npz"
             np.savez(save_path, **log)
             print(robot.data.body_names)
             print("\U00002705the motion has save in "+save_path)
-            # import wandb
-
-            # COLLECTION = args_cli.output_name
-            # run = wandb.init(project="key_2_npz", name=COLLECTION)
-            # print(f"[INFO]: Logging motion to wandb: {COLLECTION}")
-            # REGISTRY = "motions"
-            # logged_artifact = run.log_artifact(artifact_or_path="/tmp/motion.npz", name=COLLECTION, type=REGISTRY)
-            # run.link_artifact(artifact=logged_artifact, target_path=f"wandb-registry-{REGISTRY}/{COLLECTION}")
-            # print(f"[INFO]: Motion saved to wandb registry: {REGISTRY}/{COLLECTION}")
 
 
 def main():
