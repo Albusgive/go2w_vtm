@@ -558,6 +558,7 @@ from isaaclab.utils.math import (
     quat_mul,
     sample_uniform,
     yaw_quat,
+    quat_rotate_inverse
 )
 from torch.nn.utils.rnn import pad_sequence
 from go2w_vtm.terrains import ConfirmTerrainImporter
@@ -741,7 +742,8 @@ class MotionCommand(CommandTerm):
         if self.cfg.joint_names is not None:
             self.joint_indexes = self.robot.find_joints(self.cfg.joint_names, preserve_order=True)[0]
             self.joint_indexes = torch.tensor(self.joint_indexes, dtype=torch.long, device=self.device)
-            
+        
+        self.velocity = torch.zeros(self.num_envs, 3, device=self.device) # obs cmd
             
         self.terrain = self._env.scene.terrain
         if isinstance(self.terrain, ConfirmTerrainImporter):
@@ -811,6 +813,10 @@ class MotionCommand(CommandTerm):
             self.enable.unsqueeze(-1),
             raw,
             torch.zeros_like(raw))
+        
+    @property
+    def command_and_vel(self) -> torch.Tensor:
+        return torch.cat([self.command, self.velocity], dim=1)
     
     @property
     def joint_pos(self) -> torch.Tensor:
@@ -891,6 +897,16 @@ class MotionCommand(CommandTerm):
     @property
     def robot_anchor_ang_vel_w(self) -> torch.Tensor:
         return self.robot.data.body_ang_vel_w[:, self.robot_anchor_body_index]
+    
+    def anchor_lin_vel_local(self):
+        """
+        计算指定环境的 anchor 线速度在 anchor 局部坐标系下的表示，并更新 self.velocity。
+        """
+        # 获取这些环境的世界系 anchor 线速度
+        vel_w = self.anchor_lin_vel_w         # [E, 3]
+        quat_w = self.anchor_quat_w           # [E, 4]
+        # 转换到局部坐标系: v_local = R(quat_w)^T @ v_w
+        self.velocity = quat_rotate_inverse(quat_w, vel_w)  # [E, 3]
 
     def _update_metrics(self):
         self.metrics["error_anchor_pos"] = torch.norm(self.anchor_pos_w - self.robot_anchor_pos_w, dim=-1)
@@ -1057,6 +1073,8 @@ class MotionCommand(CommandTerm):
             self.cfg.adaptive_alpha * self._current_bin_failed + (1 - self.cfg.adaptive_alpha) * self.bin_failed_count
         )
 
+        self.anchor_lin_vel_local()
+        
         # Update bin_failed_count with exponential moving average
         self.bin_failed_count = (
             self.cfg.adaptive_alpha * self._current_bin_failed +

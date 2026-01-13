@@ -1,5 +1,7 @@
 logs/
 outputs/
 go2w_vtm.egg-info/
+go2w_vtm/__pycache__/
 go2w_vtm/locomotion/__pycache__/
 go2w_vtm/locomotion/go2w/__pycache__/
+go2w_vtm/locomotion/mdp/__pycache__/

@@ -11,6 +11,7 @@ from isaaclab.managers import SceneEntityCfg
 from isaaclab.sensors import RayCaster
 from isaaclab.sensors import Camera, Imu, RayCaster, RayCasterCamera, TiledCamera
 import isaaclab.utils.math as math_utils
+from go2w_vtm.locomotion.mdp.commands import MotionCommand
 
 
 if TYPE_CHECKING:
@@ -270,3 +271,10 @@ def motion_anchor_ori_b(env: ManagerBasedEnv, command_name: str) -> torch.Tensor
     )
     mat = matrix_from_quat(ori)
     return mat[..., :2].reshape(mat.shape[0], -1)
+
+
+
+def motion_commands_and_vel(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    """The motion command from command term in the command manager with the given name."""
+    command: MotionCommand = env.command_manager.get_term(command_name)
+    return command.command_and_vel
