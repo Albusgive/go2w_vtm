@@ -1095,7 +1095,7 @@ class MotionCommand(CommandTerm):
             self.cfg.adaptive_alpha * self._current_bin_failed + (1 - self.cfg.adaptive_alpha) * self.bin_failed_count
         )
 
-        self.anchor_lin_vel_local()
+        self._update_velocity_command()
         
         # Update bin_failed_count with exponential moving average
         self.bin_failed_count = (
@@ -1152,12 +1152,20 @@ class MotionCommand(CommandTerm):
                             self.cfg.ref_body_visualizer_cfg.replace(prim_path="/Visuals/Command/current/" + name)
                         )
                     )
-                    
-
+                
             for i in range(len(self.cfg.body_names)):
                 self.current_body_visualizers[i].set_visibility(True)
                 self.goal_body_visualizers[i].set_visibility(True)
                 self.current_ref_body_visualizers[i].set_visibility(True)
+            
+            if not hasattr(self, "goal_vel_visualizer"):
+                # -- goal
+                self.goal_vel_visualizer = VisualizationMarkers(self.cfg.goal_vel_visualizer_cfg)
+                # -- current
+                self.current_vel_visualizer = VisualizationMarkers(self.cfg.current_vel_visualizer_cfg)
+            # set their visibility to true
+            self.goal_vel_visualizer.set_visibility(True)
+            self.current_vel_visualizer.set_visibility(True)
 
         else:
             if hasattr(self, "current_anchor_visualizer"):
@@ -1165,6 +1173,10 @@ class MotionCommand(CommandTerm):
                     self.current_body_visualizers[i].set_visibility(False)
                     self.goal_body_visualizers[i].set_visibility(False)
                     self.current_ref_body_visualizers[i].set_visibility(False)
+            if hasattr(self, "goal_vel_visualizer"):
+                self.goal_vel_visualizer.set_visibility(False)
+                self.current_vel_visualizer.set_visibility(False)
+
 
     def _debug_vis_callback(self, event):
         if not self.robot.is_initialized:
@@ -1174,8 +1186,34 @@ class MotionCommand(CommandTerm):
             self.current_body_visualizers[i].visualize(self.robot_body_pos_w[:, i], self.robot_body_quat_w[:, i])
             self.goal_body_visualizers[i].visualize(self.body_pos_relative_w[:, i], self.body_quat_relative_w[:, i])
             self.current_ref_body_visualizers[i].visualize(self.body_pos_w[:, i], self.body_quat_w[:, i])
-            
+        
+        anchor_pos_w = self.robot_anchor_pos_w.clone()
+        anchor_pos_w[:, 2] += 0.5
+        # -- resolve the scales and quaternions
+        vel_des_arrow_scale, vel_des_arrow_quat = self._resolve_xy_velocity_to_arrow(self.velocity_command[:, :2])
+        robot_anchor_lin_vel_b = quat_rotate_inverse(self.robot_anchor_quat_w, self.robot_anchor_lin_vel_w)
+        vel_arrow_scale, vel_arrow_quat = self._resolve_xy_velocity_to_arrow(robot_anchor_lin_vel_b[:, :2])
+        # display markers
+        self.goal_vel_visualizer.visualize(anchor_pos_w, vel_des_arrow_quat, vel_des_arrow_scale)
+        self.current_vel_visualizer.visualize(anchor_pos_w, vel_arrow_quat, vel_arrow_scale)
 
+    
+    def _resolve_xy_velocity_to_arrow(self, xy_velocity: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """Converts the XY base velocity command to arrow direction rotation."""
+        # obtain default scale of the marker
+        default_scale = self.goal_vel_visualizer.cfg.markers["arrow"].scale
+        # arrow-scale
+        arrow_scale = torch.tensor(default_scale, device=self.device).repeat(xy_velocity.shape[0], 1)
+        arrow_scale[:, 0] *= torch.linalg.norm(xy_velocity, dim=1) * 3.0
+        # arrow-direction
+        heading_angle = torch.atan2(xy_velocity[:, 1], xy_velocity[:, 0])
+        zeros = torch.zeros_like(heading_angle)
+        arrow_quat = math_utils.quat_from_euler_xyz(zeros, zeros, heading_angle)
+        # convert everything back from base to world frame
+        base_quat_w = self.robot.data.root_quat_w
+        arrow_quat = math_utils.quat_mul(base_quat_w, arrow_quat)
+
+        return arrow_scale, arrow_quat
 
 @configclass
 class MotionCommandCfg(CommandTermCfg):
@@ -1212,3 +1250,18 @@ class MotionCommandCfg(CommandTermCfg):
 
     body_visualizer_cfg: VisualizationMarkersCfg = FRAME_MARKER_CFG.replace(prim_path="/Visuals/Command/pose")
     body_visualizer_cfg.markers["frame"].scale = (0.1, 0.1, 0.1)
+
+
+    goal_vel_visualizer_cfg: VisualizationMarkersCfg = GREEN_ARROW_X_MARKER_CFG.replace(
+        prim_path="/Visuals/Command/velocity_goal"
+    )
+    """The configuration for the goal velocity visualization marker. Defaults to GREEN_ARROW_X_MARKER_CFG."""
+
+    current_vel_visualizer_cfg: VisualizationMarkersCfg = BLUE_ARROW_X_MARKER_CFG.replace(
+        prim_path="/Visuals/Command/velocity_current"
+    )
+    """The configuration for the current velocity visualization marker. Defaults to BLUE_ARROW_X_MARKER_CFG."""
+
+    # Set the scale of the visualization markers to (0.5, 0.5, 0.5)
+    goal_vel_visualizer_cfg.markers["arrow"].scale = (0.5, 0.5, 0.5)
+    current_vel_visualizer_cfg.markers["arrow"].scale = (0.5, 0.5, 0.5)
