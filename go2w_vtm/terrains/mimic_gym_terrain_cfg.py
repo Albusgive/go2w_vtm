@@ -9,6 +9,9 @@ from isaaclab.utils import configclass
 from isaaclab.terrains.height_field import HfTerrainBaseCfg
 from isaaclab.terrains.sub_terrain_cfg import SubTerrainBaseCfg
 from go2w_vtm.terrains import mimic_gym_terrain
+from collections.abc import Callable
+import trimesh
+import numpy as np
 
 @configclass
 class MimicTrenchTerrainCfg(HfTerrainBaseCfg):
@@ -24,11 +27,12 @@ class MimicTrenchTerrainCfg(HfTerrainBaseCfg):
     save_name: str = "trench_terrain"
     
 @configclass
-class BoxTerrainCfg(SubTerrainBaseCfg):
+class SaveTerrainCfg(SubTerrainBaseCfg):
+    
     save_to_mjcf: bool = False
     mesh_path: str = None
     mjcf_path: str = None
-    save_name: str = "trench_box_terrain"
+    save_name: str = MISSING
     
 
 @configclass
@@ -51,7 +55,7 @@ class MimicFixBoxTerrainCfg(SubTerrainBaseCfg):
     
 
 @configclass
-class BoxTrenchTerrainCfg(BoxTerrainCfg):
+class BoxTrenchTerrainCfg(SaveTerrainCfg):
     ''' 两块box '''
     function = mimic_gym_terrain.box_trench_terrain
     
@@ -63,9 +67,6 @@ class BoxTrenchTerrainCfg(BoxTerrainCfg):
     ''' 机器人x坐标 '''
     robot_origin_x: float = 1.5
     
-    save_to_mjcf: bool = False
-    mesh_path: str = None
-    mjcf_path: str = None
     save_name: str = "trench_box_terrain"
     
     

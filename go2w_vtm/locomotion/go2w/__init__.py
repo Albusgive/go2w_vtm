@@ -64,3 +64,14 @@ gym.register(
         "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:Go2WRoughMimicPPORunnerCfg",
     },
 )
+
+
+gym.register(
+    id="Test-Rough-Mimic-Unitree-Go2W",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.rough_mimic_env_cfg:TestUnitreeGo2WMimicEnvCfg",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:Go2WRoughMimicPPORunnerCfg",
+    },
+)

@@ -103,13 +103,15 @@ def save_heightfield_as_mjcf(
     print(f"[INFO] Heightfield PNG saved to: {png_path}")
     print(f"[INFO] MJCF saved to: {xml_path}")
 
+    
 def save_terrain_as_mjcf_with_stl(
     meshes_list: list,
     origin: np.ndarray,
     output_path: str,
     filename: str,
     mesh_output_dir: str = None,
-    rgba: str = "0.8 0.6 0.4 1"
+    rgba: str = "0.8 0.6 0.4 1",
+    difficulty: float = 0.0
 ) -> None:
     """
     将 terrain 保存为 MJCF + 多个 STL 文件。
@@ -175,6 +177,12 @@ def save_terrain_as_mjcf_with_stl(
         geom.set("contype", "1")
         geom.set("conaffinity", "1")
         geom.set("group", "1")
+    
+    # 添加 <custom><text ... /></custom>
+    custom = ET.SubElement(mujoco, "custom")
+    text_elem = ET.SubElement(custom, "text")
+    text_elem.set("name", f"terrain:{filename}")          # 可自定义名称
+    text_elem.set("data", f"difficulty:{difficulty}")  # 示例：写入难度信息
 
     # 格式化 XML
     rough_string = ET.tostring(mujoco, 'unicode')

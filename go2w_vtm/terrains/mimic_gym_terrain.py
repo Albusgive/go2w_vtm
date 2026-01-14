@@ -150,7 +150,7 @@ def box_trench_terrain(difficulty: float, cfg: mimic_gym_terrain_cfg.BoxTrenchTe
     if cfg.save_to_mjcf:
         save_terrain_as_mjcf_with_stl(meshes_list=meshes_list,
                             origin=origin,output_path=cfg.mjcf_path,
-                            filename=cfg.save_name,mesh_output_dir=cfg.mesh_path)
+                            filename=cfg.save_name,mesh_output_dir=cfg.mesh_path,difficulty=difficulty)
         
 
     return meshes_list, origin
@@ -217,6 +217,6 @@ def high_platform_terrain(difficulty: float, cfg: mimic_gym_terrain_cfg.MimicHig
         save_terrain_as_mjcf_with_stl(meshes_list=meshes_list,
                             origin=origin,output_path=cfg.mjcf_path,
                             filename=cfg.save_name,mesh_output_dir=cfg.mesh_path)
-        
+
 
     return meshes_list, origin

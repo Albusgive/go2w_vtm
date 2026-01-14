@@ -234,13 +234,12 @@ CONFIRM_TERRAIN_CFG2 = ConfirmTerrainGeneratorCfg(
     curriculum=True,
     # color_scheme="random",
     sub_terrains={
-        "mimic_trench": terrain_gen.MimicFixBoxTerrainCfg(
+        "mimic_trench": terrain_gen.BoxTrenchTerrainCfg(
             # proportion=0.5, 
             
-            high_platform_x=[0.0,2.35],  
-            high_platform_z=[-0.5,-0.5],      
-            high_platform_half_width=[1.0,1.0],
-            high_platform_half_height=[0.5,0.5],
+            trench_x = 1.0,                                  
+            trench_width = (0.2,0.45),
+            trench_depth = 1.5,
             
             robot_origin_x = 0.8,
                 

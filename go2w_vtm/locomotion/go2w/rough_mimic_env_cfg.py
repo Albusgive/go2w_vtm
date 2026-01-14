@@ -47,7 +47,7 @@ class UnitreeGo2WRewardsCfg(RewardsCfg):
 @configclass
 class UnitreeGo2WMimicEnvCfg(MimicEnvCfg):
     actions: UnitreeGo2WActionsCfg = UnitreeGo2WActionsCfg()
-    rewards: UnitreeGo2WRewardsCfg = UnitreeGo2WRewardsCfg()
+    # rewards: UnitreeGo2WRewardsCfg = UnitreeGo2WRewardsCfg()
 
     base_link_name = "base"
     foot_link_name = ".*_foot"
@@ -117,6 +117,7 @@ class UnitreeGo2WMimicEnvCfg(MimicEnvCfg):
                                                     "mimic_trench":["leap_k"],
                                                     "mimic_high_platform":["climb_k"]
                                                    }
+        self.commands.motion.debug_vis = False
         # ------------------------------Observations------------------------------
         self.observations.policy.joint_pos.func = mdp.joint_pos_rel
         self.observations.policy.joint_pos.params["asset_cfg"] = SceneEntityCfg(
@@ -161,3 +162,35 @@ class UnitreeGo2WMimicEnvCfg(MimicEnvCfg):
             self.disable_zero_weight_rewards()
 
         
+@configclass
+class TestUnitreeGo2WMimicEnvCfg(UnitreeGo2WMimicEnvCfg):
+    
+    def __post_init__(self):
+        # post init of parent
+        super().__post_init__()
+
+        # ------------------------------Sence------------------------------
+        self.scene.robot = UNITREE_GO2W_NO_MOTOR_LIMIT_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+        # ------------------------------Terrain------------------------------
+        self.scene.terrain.terrain_generator = CONFIRM_TERRAIN_CFG2
+        # ------------------------------commands------------------------------
+        jump_path = os.path.join(go2w_vtm.MONTION_DIR, "jump.npz")
+        leap1_path = os.path.join(go2w_vtm.MONTION_DIR, "leap1.npz")
+        leap2_path = os.path.join(go2w_vtm.MONTION_DIR, "leap2.npz")
+        leap3_path = os.path.join(go2w_vtm.MONTION_DIR, "leap3.npz")
+        leap_k_path = os.path.join(go2w_vtm.MONTION_DIR, "leap_k.npz")
+        climb_k_path = os.path.join(go2w_vtm.MONTION_DIR, "climb_k.npz")
+        # self.commands.motion.motion_files = {"leap_k": leap_k_path}
+        self.commands.motion.motion_files = {"jump": jump_path,"leap_k": leap_k_path,"climb_k": climb_k_path}    #: dict[str, str]
+        self.commands.motion.anchor_body_name = "base"
+        self.commands.motion.body_names = self.body_names
+        self.commands.motion.joint_names = self.leg_joint_names
+        self.commands.motion.terrain_motion_map = {
+                                                    "mimic_trench":["jump"],
+                                                    "mimic_high_platform":["jump"]
+                                                   }
+        # self.commands.motion.terrain_motion_map = {
+        #                                             "mimic_trench":["leap_k"],
+        #                                             "mimic_high_platform":["climb_k"]
+        #                                            }
+    
