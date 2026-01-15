@@ -156,20 +156,20 @@ CONFIRM_TERRAIN_CFG = ConfirmTerrainGeneratorCfg(
     curriculum=True,
     # color_scheme="random",
     sub_terrains={
-        "mimic_trench": terrain_gen.MimicFixBoxTerrainCfg(
-            # proportion=0.5, 
+        # "mimic_trench": terrain_gen.MimicFixBoxTerrainCfg(
+        #     # proportion=0.5, 
             
-            high_platform_x=[0.0,2.35],  
-            high_platform_z=[-0.5,-0.5],      
-            high_platform_half_width=[1.0,1.0],
-            high_platform_half_height=[0.5,0.5],
+        #     high_platform_x=[0.0,2.35],  
+        #     high_platform_z=[-0.5,-0.5],      
+        #     high_platform_half_width=[1.0,1.0],
+        #     high_platform_half_height=[0.5,0.5],
             
-            robot_origin_x = 0.8,
+        #     robot_origin_x = 0.8,
                 
-            save_to_mjcf = True,
-            mesh_path = go2w_vtm.GO2W_MJCF_DIR + "/meshs/",
-            mjcf_path = go2w_vtm.GO2W_MJCF_DIR,
-        ),
+        #     save_to_mjcf = True,
+        #     mesh_path = go2w_vtm.GO2W_MJCF_DIR + "/meshs/",
+        #     mjcf_path = go2w_vtm.GO2W_MJCF_DIR,
+        # ),
         "mimic_high_platform": terrain_gen.MimicFixBoxTerrainCfg(
             # proportion=0.5,
             

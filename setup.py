@@ -2,7 +2,8 @@ from setuptools import setup
 
 # Minimum dependencies required prior to installation
 INSTALL_REQUIRES = [
-
+    "pygame"
+    "opencv-python"
 ]
 
 # Installation operation

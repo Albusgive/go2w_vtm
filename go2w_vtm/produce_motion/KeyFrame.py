@@ -5,29 +5,30 @@ import numpy as np
 import mujoco
 
 class KeyData:
-    """内存中存储的关键帧数据"""
+    """内存中存储的关键帧数据，全部使用 numpy 数组以匹配 MuJoCo 格式"""
     def __init__(self):
         self.name: str = ""
         self.time: float = 0.0
-        self.qpos: List[float] = []
-        self.qvel: List[float] = []
-        self.mocap_pos: List[float] = []
-        self.mocap_quat: List[float] = []
-        self.act: List[float] = []
-        self.ctrl: List[float] = []
-        
-        
+        self.qpos: Optional[np.ndarray] = None
+        self.qvel: Optional[np.ndarray] = None
+        self.act: Optional[np.ndarray] = None
+        self.ctrl: Optional[np.ndarray] = None
+        self.mocap_pos: Optional[np.ndarray] = None  # Shape: (nmocap, 3)
+        self.mocap_quat: Optional[np.ndarray] = None # Shape: (nmocap, 4)
+
+
 class KeyFrame:
     def __init__(self):
-        # Body filtering
+        # Body filtering / Mocap binding
         self.record_single_body: bool = False
         self.body_id: int = -1
         self.qpos_indices: List[int] = []
         self.qvel_indices: List[int] = []
+        
         self.is_mocap_body: bool = False
         self.mocap_body_id: int = -1
 
-        # Field selection flags (time is always saved)
+        # Field selection flags
         self.save_qpos: bool = True
         self.save_qvel: bool = True
         self.save_act: bool = True
@@ -35,21 +36,19 @@ class KeyFrame:
         self.save_mocap_pos: bool = True
         self.save_mocap_quat: bool = True
 
-        # Recording frequency control
-        self.record_dt: Optional[float] = None   # desired time interval between keys
+        self.record_dt: Optional[float] = None
         self.last_record_time: float = 0.0     
-
         self.keys_in_memory: List[KeyData] = []
     
     def setRecordMocapBody2Body(self, model, body_name: str):
-        """ 如果是mocap body会记录第一个mocap_pos mocap_quat 并拼接到qpos中"""
+        """记录时保持独立，但在保存 XML 时将此 body 的 mocap 数据合入 qpos 头部"""
         body_id = model.body(name=body_name).id
         self.mocap_body_id = model.body_mocapid[body_id]
         if self.mocap_body_id != -1:
             self.is_mocap_body = True
         else:
             raise ValueError(f"Body '{body_name}' is not a mocap body.")
-        print(f"✅ Now recording mocap body '{body_name}' ,nqpos={model.nq},nqvel={model.nv}")
+        print(f"✅ Bound mocap body '{body_name}' to qpos header for export.")
 
     def setRecordBody(self, model, body_name: str):
         """设置只记录某个 body 及其子树的 qpos/qvel"""
@@ -129,44 +128,36 @@ class KeyFrame:
             raise ValueError("fps must be positive.")
         self.set_record_dt(1.0 / fps)
         
-    def get_now_key(self, model, data, name: str = "",time:float=None):
+    def get_now_key(self, model, data, name: str = "", time: float = None) -> KeyData:
         key = KeyData()
         key.name = name
-        if time is not None:
-            key.time = time
-        else:
-            key.time = data.time
-        # qpos
+        key.time = time if time is not None else data.time
+        
+        # 使用 np.array 或 copy 确保获取的是数据快照而非引用
         if self.save_qpos:
-            if self.is_mocap_body:
-                key.qpos = (
-                data.mocap_pos[self.mocap_body_id].tolist() +
-                data.mocap_quat[self.mocap_body_id].tolist() +
-                data.qpos.tolist())
+            if self.record_single_body and self.qpos_indices:
+                key.qpos = np.array(data.qpos[self.qpos_indices], dtype=np.float64)
             else:
-                if self.record_single_body and self.qpos_indices:
-                    key.qpos = [float(data.qpos[i]) for i in self.qpos_indices]
-                elif model.nq > 0:
-                    key.qpos = data.qpos.tolist()
-        # qvel
+                key.qpos = np.array(data.qpos, dtype=np.float64)
+
         if self.save_qvel:
-            if self.is_mocap_body:
-                key.qvel = data.qvel.tolist()
+            if self.record_single_body and self.qvel_indices:
+                key.qvel = np.array(data.qvel[self.qvel_indices], dtype=np.float64)
             else:
-                if self.record_single_body and self.qvel_indices:
-                    key.qvel = [float(data.qvel[i]) for i in self.qvel_indices]
-                elif model.nv > 0:
-                    key.qvel = data.qvel.tolist()
-        # act
+                key.qvel = np.array(data.qvel, dtype=np.float64)
+
         if self.save_act and model.na > 0:
-            key.act = data.act.tolist()
-        # ctrl
+            key.act = np.array(data.act, dtype=np.float64)
+            
         if self.save_ctrl and model.nu > 0:
-            key.ctrl = data.ctrl.tolist()
+            key.ctrl = np.array(data.ctrl, dtype=np.float64)
+        
         if self.save_mocap_pos and model.nmocap > 0:
-            key.mocap_pos = data.mocap_pos.flatten().tolist()
+            key.mocap_pos = np.array(data.mocap_pos, dtype=np.float64) # (nmocap, 3)
+            
         if self.save_mocap_quat and model.nmocap > 0:
-            key.mocap_quat = data.mocap_quat.flatten().tolist()
+            key.mocap_quat = np.array(data.mocap_quat, dtype=np.float64) # (nmocap, 4)
+            
         return key
     
     def record(self, model, data, name: str = "",time:float=None):
@@ -202,9 +193,6 @@ class KeyFrame:
         self.keys_in_memory[n] = self.get_now_key(model, data, name,time)
 
     def save_as_xml(self, file_path: str):
-        """
-        保存为 MuJoCo keyframe XML 格式，自动覆盖
-        """
         if not self.keys_in_memory:
             print("No keys to save.")
             return
@@ -214,67 +202,52 @@ class KeyFrame:
 
         for key_data in self.keys_in_memory:
             key_elem = ET.SubElement(keyframe_elem, "key")
-            if key_data.name:
-                key_elem.set("name", key_data.name)
+            if key_data.name: key_elem.set("name", key_data.name)
             key_elem.set("time", str(key_data.time))
 
-            if self.save_qpos and key_data.qpos:
-                key_elem.set("qpos", " ".join(map(str, key_data.qpos)))
-            if self.save_qvel and key_data.qvel:
+            # --- QPOS 逻辑: 处理 Mocap 拼接 ---
+            if self.save_qpos and key_data.qpos is not None:
+                if self.is_mocap_body and key_data.mocap_pos is not None:
+                    # 提取特定 body 的 3位 pos 和 4位 quat
+                    m_pos = key_data.mocap_pos[self.mocap_body_id]
+                    m_quat = key_data.mocap_quat[self.mocap_body_id]
+                    # 拼接为 [pos, quat, qpos...]
+                    combined_qpos = np.concatenate([m_pos, m_quat, key_data.qpos])
+                    key_elem.set("qpos", " ".join(map(str, combined_qpos)))
+                else:
+                    key_elem.set("qpos", " ".join(map(str, key_data.qpos)))
+
+            # --- 其他标准字段 ---
+            if self.save_qvel and key_data.qvel is not None:
                 key_elem.set("qvel", " ".join(map(str, key_data.qvel)))
-            if self.save_act and key_data.act:
+            if self.save_act and key_data.act is not None:
                 key_elem.set("act", " ".join(map(str, key_data.act)))
-            if self.save_ctrl and key_data.ctrl:
+            if self.save_ctrl and key_data.ctrl is not None:
                 key_elem.set("ctrl", " ".join(map(str, key_data.ctrl)))
-            if self.save_mocap_pos and key_data.mocap_pos:
-                key_elem.set("mpos", " ".join(map(str, key_data.mocap_pos)))
-            if self.save_mocap_quat and key_data.mocap_quat:
-                key_elem.set("mquat", " ".join(map(str, key_data.mocap_quat)))
+            
+            # --- 原生 Mocap 字段 (拉平存储) ---
+            if self.save_mocap_pos and key_data.mocap_pos is not None:
+                key_elem.set("mpos", " ".join(map(str, key_data.mocap_pos.flatten())))
+            if self.save_mocap_quat and key_data.mocap_quat is not None:
+                key_elem.set("mquat", " ".join(map(str, key_data.mocap_quat.flatten())))
 
         indent(root)
         tree = ET.ElementTree(root)
         tree.write(file_path, encoding="utf-8", xml_declaration=True)
-        print(f"✅ Saved {len(self.keys_in_memory)} keys to XML: {file_path}")
+        print(f"✅ Exported {len(self.keys_in_memory)} keys to XML (Mocap-to-Qpos: {self.is_mocap_body})")
         
     def save_as_npz(self, file_path: str):
-        """
-        保存为 NumPy NPZ 格式，自动覆盖
-        """
-        if not self.keys_in_memory:
-            print("No keys to save.")
-            return
-
-        times = np.array([key.time for key in self.keys_in_memory], dtype=np.float32)
-
-        qpos = None
-        if self.save_qpos:
-            qpos = np.array([key.qpos for key in self.keys_in_memory], dtype=np.float32)
-        qvel = None
-        if self.save_qvel:
-            qvel = np.array([key.qvel for key in self.keys_in_memory], dtype=np.float32)
-        act = None
-        if self.save_act:
-            act = np.array([key.act for key in self.keys_in_memory], dtype=np.float32)
-        ctrl = None
-        if self.save_ctrl:
-            ctrl = np.array([key.ctrl for key in self.keys_in_memory], dtype=np.float32)
-        if self.save_mocap_pos:
-            mocap_pos = np.array([key.mocap_pos for key in self.keys_in_memory], dtype=np.float32)
-        mocap_pos = None
-        if self.save_mocap_quat:
-            mocap_quat = np.array([key.mocap_quat for key in self.keys_in_memory], dtype=np.float32)
-        mocap_quat = None
-        np.savez_compressed(
-            file_path,
-            time=times,
-            qpos=qpos,
-            qvel=qvel,
-            act=act,
-            ctrl=ctrl,
-            mocap_pos=mocap_pos,
-            mocap_quat=mocap_quat
-        )
-        print(f"✅ Saved {len(self.keys_in_memory)} keys to NPZ: {file_path}")
+        if not self.keys_in_memory: return
+        # 将内存中的 List[np.ndarray] 堆叠成高维数组方便直接加载
+        save_dict = {"time": np.array([k.time for k in self.keys_in_memory], dtype=np.float32)}
+        if self.save_qpos: save_dict["qpos"] = np.stack([k.qpos for k in self.keys_in_memory])
+        if self.save_qvel: save_dict["qvel"] = np.stack([k.qvel for k in self.keys_in_memory])
+        if self.save_act: save_dict["act"] = np.stack([k.act for k in self.keys_in_memory])
+        if self.save_ctrl: save_dict["ctrl"] = np.stack([k.ctrl for k in self.keys_in_memory])
+        if self.save_mocap_pos: save_dict["mocap_pos"] = np.stack([k.mocap_pos for k in self.keys_in_memory])
+        if self.save_mocap_quat: save_dict["mocap_quat"] = np.stack([k.mocap_quat for k in self.keys_in_memory])
+        np.savez_compressed(file_path, **save_dict)
+        print(f"✅ Saved to NPZ: {file_path}")
 
     def clear(self):
         """清空内存中所有记录"""

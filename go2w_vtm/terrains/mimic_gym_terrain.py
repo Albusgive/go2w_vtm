@@ -8,7 +8,8 @@ from isaaclab.terrains.height_field.utils import height_field_to_mesh
 import trimesh
 from xml.dom import minidom
 from isaaclab.terrains.trimesh.utils import make_plane
-from go2w_vtm.utils import *
+import xml.etree.ElementTree as ET
+import os
 
 
 if TYPE_CHECKING:

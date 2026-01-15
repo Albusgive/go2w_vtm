@@ -7,6 +7,7 @@ import glfw
 import mujoco
 from go2w_vtm.utils.mjcf_editor import MJCFEditor
 from go2w_vtm.produce_motion.decode_terrain import DecodeTerrain
+import time
 
 # plugin_path = go2w_vtm.GO2W_MJCF_DIR + "/mj_plugin"
 # mujoco.mj_loadAllPluginLibraries(plugin_path)
@@ -36,17 +37,21 @@ cfg = IK_and_savekey.mink_cfg("base_link",anchor,anchor_ref)
 cfg.orientation_cost = 0.6
 
 plk = IK_and_savekey.PlanningKeyframe(temp_k_path,cfg,save_key_path=go2w_vtm.GO2W_MJCF_DIR,save_key_name="terrain_k") # mink
-# plk.load_relative_npz(go2w_vtm.GO2W_MJCF_DIR + "/terrain_k.npz")
-# plk.sync_from_model_keys()
-
-# TODO 调整key 添加key过程状态描述,保存为mjcf并通过name描述key过程状态, key2npz功能增加,check_point_key模式的npz文件 加载给IK_motion_loader
-# 单线程mujoco测试:插值计算(并行通用计算),motion trace randmonize
+hz = 50
+plk.run_interpolation_and_store(go2w_vtm.GO2W_MJCF_DIR + "/terrain_k.npz",(1.0,0.0,0.0),hz)
+# plk.is_normal_mode = True
 with mujoco.viewer.launch_passive(plk.model, plk.data,key_callback=plk.key_callback,
                                   show_left_ui=False,show_right_ui=False) as viewer:
     plk.draw_terrain_key_pos(viewer)
+    replay_k = 0
     while viewer.is_running():
+        start_time = time.time()
+        plk.reset_key(replay_k)
         plk.update()
-        mujoco.mj_forward(plk.model, plk.data)
-
+        replay_k += 1
+        if replay_k >= plk.nkey:
+            replay_k = 0
+        end_time = time.time()
+        time.sleep(max(0,1.0/hz - (end_time - start_time)))
         viewer.sync()
         
