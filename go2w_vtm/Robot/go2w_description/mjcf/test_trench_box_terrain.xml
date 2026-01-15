@@ -1,0 +1,19 @@
+<mujoco model="test_trench_box_terrain">
+  <asset>
+    <mesh name="test_trench_box_terrain_mesh0" file="meshs/test_trench_box_terrain_mesh0.stl"/>
+    <mesh name="test_trench_box_terrain_mesh1" file="meshs/test_trench_box_terrain_mesh1.stl"/>
+  </asset>
+  <worldbody>
+    <geom type="mesh" mesh="test_trench_box_terrain_mesh0" rgba="0.8 0.6 0.4 1" pos="-0.8 -1.25 -0.05" contype="1" conaffinity="1" group="1"/>
+    <geom type="mesh" mesh="test_trench_box_terrain_mesh1" rgba="0.8 0.6 0.4 1" pos="-0.8 -1.25 -0.05" contype="1" conaffinity="1" group="1"/>
+  </worldbody>
+  <custom>
+    <text name="terrain:test_trench_box_terrain" data="difficulty:0.8279504967218619"/>
+    <text name="terrain_key_pos0" data="0.5 0.0 -0.05"/>
+    <text name="terrain_key_pos1" data="1.0 0.0 -0.05"/>
+    <text name="terrain_key_pos2" data="1.1 0.0 -0.05"/>
+    <text name="terrain_key_pos3" data="1.2 0.0 -0.05"/>
+    <text name="terrain_key_pos4" data="1.4069876241804653 0.0 -0.05"/>
+    <text name="terrain_key_pos5" data="1.7069876241804651 0.0 -0.05"/>
+  </custom>
+</mujoco>

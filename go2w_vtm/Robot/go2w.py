@@ -2,6 +2,7 @@
 import isaaclab.sim as sim_utils
 from isaaclab.actuators import DCMotorCfg
 from isaaclab.assets.articulation import ArticulationCfg
+from isaaclab.actuators import DelayedPDActuatorCfg, ImplicitActuatorCfg
 import go2w_vtm
 
 UNITREE_GO2W_CFG = ArticulationCfg(

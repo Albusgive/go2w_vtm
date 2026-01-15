@@ -124,7 +124,6 @@ MIMIC_GYM_TERRAIN_CFG = TerrainGeneratorCfg(
             save_to_mjcf = True,
             mesh_path = go2w_vtm.GO2W_MJCF_DIR + "/meshs/",
             mjcf_path = go2w_vtm.GO2W_MJCF_DIR,
-            save_name = "trench_box_terrain"
         ),
         # "mimic_high_platform": terrain_gen.MimicFixBoxTerrainCfg(
         #     # proportion=0.5,
@@ -139,7 +138,6 @@ MIMIC_GYM_TERRAIN_CFG = TerrainGeneratorCfg(
         #     save_to_mjcf = True,
         #     mesh_path = go2w_vtm.GO2W_MJCF_DIR + "/meshs/",
         #     mjcf_path = go2w_vtm.GO2W_MJCF_DIR,
-        #     save_name = "high_platform"
         # ),
     }
 )
@@ -171,7 +169,6 @@ CONFIRM_TERRAIN_CFG = ConfirmTerrainGeneratorCfg(
             save_to_mjcf = True,
             mesh_path = go2w_vtm.GO2W_MJCF_DIR + "/meshs/",
             mjcf_path = go2w_vtm.GO2W_MJCF_DIR,
-            save_name = "trench_box_terrain"
         ),
         "mimic_high_platform": terrain_gen.MimicFixBoxTerrainCfg(
             # proportion=0.5,
@@ -186,7 +183,6 @@ CONFIRM_TERRAIN_CFG = ConfirmTerrainGeneratorCfg(
             save_to_mjcf = True,
             mesh_path = go2w_vtm.GO2W_MJCF_DIR + "/meshs/",
             mjcf_path = go2w_vtm.GO2W_MJCF_DIR,
-            save_name = "high_platform"
         ),
         # "mimic_trench": terrain_gen.BoxTrenchTerrainCfg(
         #     # proportion=0.5, 
@@ -200,7 +196,6 @@ CONFIRM_TERRAIN_CFG = ConfirmTerrainGeneratorCfg(
         #     save_to_mjcf = True,
         #     mesh_path = go2w_vtm.GO2W_MJCF_DIR + "/meshs/",
         #     mjcf_path = go2w_vtm.GO2W_MJCF_DIR,
-        #     save_name = "trench_box_terrain"
         # ),
         
         # "mimic_trench": terrain_gen.MimicFixBoxTerrainCfg(
@@ -216,7 +211,6 @@ CONFIRM_TERRAIN_CFG = ConfirmTerrainGeneratorCfg(
         #     save_to_mjcf = True,
         #     mesh_path = go2w_vtm.GO2W_MJCF_DIR + "/meshs/",
         #     mjcf_path = go2w_vtm.GO2W_MJCF_DIR,
-        #     save_name = "trench_box_terrain"
         # ),
     }
 )
@@ -234,7 +228,7 @@ CONFIRM_TERRAIN_CFG2 = ConfirmTerrainGeneratorCfg(
     curriculum=True,
     # color_scheme="random",
     sub_terrains={
-        "mimic_trench": terrain_gen.BoxTrenchTerrainCfg(
+        "test_mimic_trench": terrain_gen.BoxTrenchTerrainCfg(
             # proportion=0.5, 
             
             trench_x = 1.0,                                  
@@ -246,7 +240,11 @@ CONFIRM_TERRAIN_CFG2 = ConfirmTerrainGeneratorCfg(
             save_to_mjcf = True,
             mesh_path = go2w_vtm.GO2W_MJCF_DIR + "/meshs/",
             mjcf_path = go2w_vtm.GO2W_MJCF_DIR,
-            save_name = "trench_box_terrain"
+            
+            init_key_pos_distance = 0.5,
+            end_key_pos_distance = 0.3,
+            
+            terrain_name = "test_trench_box_terrain"
         ),
     }
 )

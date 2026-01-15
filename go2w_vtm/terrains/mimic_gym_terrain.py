@@ -6,15 +6,118 @@ import scipy.interpolate as interpolate
 from typing import TYPE_CHECKING
 from isaaclab.terrains.height_field.utils import height_field_to_mesh
 import trimesh
+from xml.dom import minidom
 from isaaclab.terrains.trimesh.utils import make_plane
 from go2w_vtm.utils import *
+
 
 if TYPE_CHECKING:
     from . import mimic_gym_terrain_cfg
 
+def save_terrain_as_mjcf_with_stl(
+    cfg: mimic_gym_terrain_cfg.SaveTerrainCfg,
+    meshes_list: list,
+    origin: np.ndarray,
+    difficulty: float = 0.0,
+    terrain_key_pos_list: list[np.ndarray] = None,
+    rgba: str = "0.8 0.6 0.4 1",
+) -> None:
+    """
+    将 terrain 保存为 MJCF + 多个 STL 文件。
+    
+    每个 mesh 保存为独立 STL，MJCF 通过 <mesh file="..."/> 引用，并显式命名。
+    
+    参数:
+    - cfg: SaveTerrainCfg
+    - meshes_list: List[trimesh.Trimesh]
+    - origin: np.ndarray (3,) —— 地形在 MuJoCo 中的期望中心位置（XY 对齐）
+    - difficulty: float —— 难度系数
+    - check_point_key: 两个检查点 init_key_pos  end_key_pos
+    - rgba: str —— geom 颜色
+    """
+    if not cfg.save_to_mjcf:
+        return
+    if not meshes_list:
+        raise ValueError("meshes_list is empty.")
 
-import trimesh
-import numpy as np
+    stl_dir = cfg.mesh_path if cfg.mesh_path is not None else cfg.mjcf_path
+    os.makedirs(cfg.mjcf_path, exist_ok=True)
+    os.makedirs(stl_dir, exist_ok=True)
+
+    # 计算整体平移
+    combined = trimesh.util.concatenate(meshes_list)
+    bounds = combined.bounds
+    if bounds is None:
+        raise ValueError("All meshes are empty.")
+
+    mujoco = ET.Element("mujoco", model=cfg.terrain_name)
+    asset = ET.SubElement(mujoco, "asset")
+    worldbody = ET.SubElement(mujoco, "worldbody")
+
+    for i, mesh in enumerate(meshes_list):
+        if not mesh.vertices.size or not mesh.faces.size:
+            continue
+
+        mesh_trans = mesh.copy()
+
+        # ✅ STL 文件名（不含路径）
+        stl_name = f"{cfg.terrain_name}_mesh{i}.stl"
+        stl_full_path = os.path.join(stl_dir, stl_name)
+        mesh_trans.export(stl_full_path)
+
+        # ✅ Mesh 的逻辑名称（用于 <geom mesh="..."/>）
+        mesh_id = f"{cfg.terrain_name}_mesh{i}"
+
+        # 相对路径（用于 file=""）
+        if os.path.abspath(stl_dir) == os.path.abspath(cfg.mjcf_path):
+            file_rel = stl_name
+        else:
+            file_rel = os.path.relpath(stl_full_path, cfg.mjcf_path).replace("\\", "/")
+
+        # ✅ 显式设置 name，避免依赖隐式命名
+        mesh_elem = ET.SubElement(asset, "mesh")
+        mesh_elem.set("name", mesh_id)      # ←←← 关键：显式命名
+        mesh_elem.set("file", file_rel)
+
+        # ✅ geom 引用这个 name
+        geom = ET.SubElement(worldbody, "geom")
+        geom.set("type", "mesh")
+        geom.set("mesh", mesh_id)           # ←←← 必须匹配上面的 name
+        geom.set("rgba", rgba)
+        geom.set("pos", str(-origin[0]) + " " + str(-origin[1]) + " " + str(-origin[2]))
+        geom.set("contype", "1")
+        geom.set("conaffinity", "1")
+        geom.set("group", "1")
+    
+    # 添加 <custom><text ... /></custom>
+    custom = ET.SubElement(mujoco, "custom")
+    text_elem = ET.SubElement(custom, "text")
+    text_elem.set("name", f"terrain:{cfg.terrain_name}")        
+    text_elem.set("data", f"difficulty:{difficulty}")  # 示例：写入难度信息
+    # 关键点
+    if terrain_key_pos_list is not None:
+        for i,pos in enumerate(terrain_key_pos_list):
+            _pos = pos - origin
+            text_elem = ET.SubElement(custom, "text")
+            text_elem.set("name", f"terrain_key_pos{i}")
+            text_elem.set("data", f"{_pos[0]} {_pos[1]} {_pos[2]}")
+    
+
+    # 格式化 XML
+    rough_string = ET.tostring(mujoco, 'unicode')
+    reparsed = minidom.parseString(rough_string)
+    pretty_xml = reparsed.toprettyxml(indent="  ")
+
+    lines = pretty_xml.splitlines()
+    final_xml = "\n".join(lines[1:]) if lines and lines[0].startswith('<?xml') else pretty_xml
+
+    mjcf_filepath = os.path.join(cfg.mjcf_path, f"{cfg.terrain_name}.xml")
+    with open(mjcf_filepath, "w") as f:
+        f.write(final_xml)
+
+    print(f"[INFO] MJCF saved to: {mjcf_filepath}")
+    print(f"[INFO] STL files saved to: {stl_dir}/")
+    
 
 def make_plane_box(
     size: tuple[float, float],
@@ -55,30 +158,6 @@ def make_plane_box(
 
     return box
 
-  
-@height_field_to_mesh
-def trench_terrain(difficulty: float, cfg: mimic_gym_terrain_cfg.MimicTrenchTerrainCfg) -> np.ndarray:
-    """
-    在 X 方向指定位置生成一条沿 Y 轴局部范围的沟（trench）。
-    """
-    width_pixels = int(cfg.size[0] / cfg.horizontal_scale)   # X
-    length_pixels = int(cfg.size[1] / cfg.horizontal_scale)  # Y
-    trench_depth_px = cfg.trench_depth / cfg.vertical_scale # Z
-
-    hf_raw = np.zeros((width_pixels, length_pixels), dtype=np.float32)
-
-    x_center_px = (cfg.trench_start_x + cfg.size[0] / 2.0) / cfg.horizontal_scale
-    half_width_px = (cfg.trench_width / 2.0) / cfg.horizontal_scale
-    x_low = int(np.clip(x_center_px - half_width_px, 0, width_pixels - 1))
-    x_high = int(np.clip(x_center_px + half_width_px, 0, width_pixels - 1))
-
-    hf_raw[x_low:x_high, 0:length_pixels-1] = -trench_depth_px
-    if cfg.save_to_mjcf:
-        save_heightfield_as_mjcf(hf_raw,cfg.horizontal_scale,
-                    cfg.vertical_scale,cfg.mjcf_path,cfg.save_name,cfg.png_path)
-        
-    return np.rint(hf_raw).astype(np.int16)
-
 
 def create_mujoco_box_mesh(
     size: list | tuple | np.ndarray,
@@ -116,6 +195,67 @@ def create_mujoco_box_mesh(
     return box
 
 
+def fix_box_terrain(difficulty: float, cfg: mimic_gym_terrain_cfg.MimicFixBoxTerrainCfg) -> np.ndarray:
+    """
+    高台只能使用box,如果修改高度场就会出现初始z为最高位置
+    """
+    if len(cfg.high_platform_x) != len(cfg.high_platform_half_width) or len(cfg.high_platform_x) != len(cfg.high_platform_half_width):
+        raise ValueError("high_platform_x, high_platform_width, high_platform_height must have the same length.")
+    
+    # 初始化网格列表
+    meshes_list = []
+
+    # --  创建基础地面 --
+    # ground_plane = make_plane_box(cfg.size, height=0.0, center_zero=False)
+    # meshes_list.append(ground_plane)
+    
+    # -- 定义机器人出生点 --
+    terrain_center = np.array([0.5 * cfg.size[0], 0.5 * cfg.size[1]])
+    origin = np.array([cfg.robot_origin_x, terrain_center[1], 0.05]) # 稍高于平台
+
+    for i in range(len(cfg.high_platform_x)):
+        box_size=[cfg.high_platform_half_width[i],cfg.size[1]/2,cfg.high_platform_half_height[i]]
+        box_center_pos=[cfg.high_platform_x[i],0,cfg.high_platform_z[i]]
+        box_mesh = create_mujoco_box_mesh(box_size, box_center_pos, origin)
+        meshes_list.append(box_mesh)
+    
+    save_terrain_as_mjcf_with_stl(cfg=cfg, meshes_list=meshes_list, origin=origin, difficulty=difficulty)
+
+    return meshes_list, origin
+
+
+def high_platform_terrain(difficulty: float, cfg: mimic_gym_terrain_cfg.MimicHighPlatformTerrainCfg) -> np.ndarray:
+    """
+    高台只能使用box,如果修改高度场就会出现初始z为最高位置
+    """
+    if len(cfg.high_platform_start_x) != len(cfg.high_platform_width) or len(cfg.high_platform_start_x) != len(cfg.high_platform_height):
+        raise ValueError("high_platform_start_x, high_platform_width, high_platform_height must have the same length.")
+    
+    # 初始化网格列表
+    meshes_list = []
+
+    # --  创建基础地面 --
+    ground_plane = make_plane_box(cfg.size, height=0.0, center_zero=False)
+    meshes_list.append(ground_plane)
+    
+    # -- 定义机器人出生点 --
+    terrain_center = np.array([0.5 * cfg.size[0], 0.5 * cfg.size[1]])
+    origin = np.array([cfg.robot_origin_x, terrain_center[1], 0.05]) # 稍高于平台
+
+    for i in range(len(cfg.high_platform_start_x)):
+        box_size=[cfg.high_platform_width[i]/2,cfg.size[1]/2,cfg.high_platform_height[i]/2]
+        box_center_pos=[cfg.high_platform_start_x[i],0,cfg.high_platform_height[i]/2]
+        box_mesh = create_mujoco_box_mesh(box_size, box_center_pos, origin)
+        meshes_list.append(box_mesh)
+    
+    save_terrain_as_mjcf_with_stl(cfg=cfg, meshes_list=meshes_list, origin=origin, difficulty=difficulty)
+
+
+    return meshes_list, origin
+
+
+''' 全新地形 '''
+
 def box_trench_terrain(difficulty: float, cfg: mimic_gym_terrain_cfg.BoxTrenchTerrainCfg) -> np.ndarray:
     """
     生成两块box
@@ -146,77 +286,9 @@ def box_trench_terrain(difficulty: float, cfg: mimic_gym_terrain_cfg.BoxTrenchTe
     box2 = trimesh.creation.box(extents=box2_extents)
     box2.apply_translation(box2_center_pos)
     meshes_list.append(box2)
-    
-    if cfg.save_to_mjcf:
-        save_terrain_as_mjcf_with_stl(meshes_list=meshes_list,
-                            origin=origin,output_path=cfg.mjcf_path,
-                            filename=cfg.save_name,mesh_output_dir=cfg.mesh_path,difficulty=difficulty)
-        
 
-    return meshes_list, origin
-
-
-def fix_box_terrain(difficulty: float, cfg: mimic_gym_terrain_cfg.MimicFixBoxTerrainCfg) -> np.ndarray:
-    """
-    高台只能使用box,如果修改高度场就会出现初始z为最高位置
-    """
-    if len(cfg.high_platform_x) != len(cfg.high_platform_half_width) or len(cfg.high_platform_x) != len(cfg.high_platform_half_width):
-        raise ValueError("high_platform_x, high_platform_width, high_platform_height must have the same length.")
-    
-    # 初始化网格列表
-    meshes_list = []
-
-    # --  创建基础地面 --
-    # ground_plane = make_plane_box(cfg.size, height=0.0, center_zero=False)
-    # meshes_list.append(ground_plane)
-    
-    # -- 定义机器人出生点 --
-    terrain_center = np.array([0.5 * cfg.size[0], 0.5 * cfg.size[1]])
-    origin = np.array([cfg.robot_origin_x, terrain_center[1], 0.05]) # 稍高于平台
-
-    for i in range(len(cfg.high_platform_x)):
-        box_size=[cfg.high_platform_half_width[i],cfg.size[1]/2,cfg.high_platform_half_height[i]]
-        box_center_pos=[cfg.high_platform_x[i],0,cfg.high_platform_z[i]]
-        box_mesh = create_mujoco_box_mesh(box_size, box_center_pos, origin)
-        meshes_list.append(box_mesh)
-    
-    if cfg.save_to_mjcf:
-        save_terrain_as_mjcf_with_stl(meshes_list=meshes_list,
-                            origin=origin,output_path=cfg.mjcf_path,
-                            filename=cfg.save_name,mesh_output_dir=cfg.mesh_path)
-        
-
-    return meshes_list, origin
-
-
-def high_platform_terrain(difficulty: float, cfg: mimic_gym_terrain_cfg.MimicHighPlatformTerrainCfg) -> np.ndarray:
-    """
-    高台只能使用box,如果修改高度场就会出现初始z为最高位置
-    """
-    if len(cfg.high_platform_start_x) != len(cfg.high_platform_width) or len(cfg.high_platform_start_x) != len(cfg.high_platform_height):
-        raise ValueError("high_platform_start_x, high_platform_width, high_platform_height must have the same length.")
-    
-    # 初始化网格列表
-    meshes_list = []
-
-    # --  创建基础地面 --
-    ground_plane = make_plane_box(cfg.size, height=0.0, center_zero=False)
-    meshes_list.append(ground_plane)
-    
-    # -- 定义机器人出生点 --
-    terrain_center = np.array([0.5 * cfg.size[0], 0.5 * cfg.size[1]])
-    origin = np.array([cfg.robot_origin_x, terrain_center[1], 0.05]) # 稍高于平台
-
-    for i in range(len(cfg.high_platform_start_x)):
-        box_size=[cfg.high_platform_width[i]/2,cfg.size[1]/2,cfg.high_platform_height[i]/2]
-        box_center_pos=[cfg.high_platform_start_x[i],0,cfg.high_platform_height[i]/2]
-        box_mesh = create_mujoco_box_mesh(box_size, box_center_pos, origin)
-        meshes_list.append(box_mesh)
-    
-    if cfg.save_to_mjcf:
-        save_terrain_as_mjcf_with_stl(meshes_list=meshes_list,
-                            origin=origin,output_path=cfg.mjcf_path,
-                            filename=cfg.save_name,mesh_output_dir=cfg.mesh_path)
-
+    terrain_check_point_list = cfg.make_check_points(difficulty)
+    save_terrain_as_mjcf_with_stl(cfg=cfg, meshes_list=meshes_list, origin=origin, 
+                                  difficulty=difficulty,terrain_key_pos_list=terrain_check_point_list)
 
     return meshes_list, origin

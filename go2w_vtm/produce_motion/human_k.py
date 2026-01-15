@@ -6,13 +6,14 @@ import glfw
 
 import mujoco
 from go2w_vtm.utils.mjcf_editor import MJCFEditor
+from go2w_vtm.produce_motion.decode_terrain import DecodeTerrain
 
 # plugin_path = go2w_vtm.GO2W_MJCF_DIR + "/mj_plugin"
 # mujoco.mj_loadAllPluginLibraries(plugin_path)
 
 
 file_path = go2w_vtm.GO2W_MJCF_DIR + "/go2w_mocap.xml"
-terrain_path = go2w_vtm.GO2W_MJCF_DIR + "/high_platform.xml"
+terrain_path = go2w_vtm.GO2W_MJCF_DIR + "/test_trench_box_terrain.xml"
 save_xml_path = go2w_vtm.GO2W_MJCF_DIR + "/human_k2.xml"
 temp_k_path = go2w_vtm.GO2W_MJCF_DIR + "/temp_k.xml"
 
@@ -36,14 +37,14 @@ cfg.orientation_cost = 0.6
 
 plk = IK_and_savekey.PlanningKeyframe(temp_k_path,cfg,True) # mink
 
-# 自定义内容 TODO  compute_k 根据TEXT内容自动生成对应的key
-id = mujoco.mj_name2id(plk.model,mujoco.mjtObj.mjOBJ_TEXT,"custom2")
-custom = plk.model.text_data[plk.model.text_adr[id]:plk.model.text_adr[id]+plk.model.text_size[id]-1]
+terrain = DecodeTerrain(plk.model)
 
 
 frame_time = 0.0
+key_id = 0
+last_key_id = 0
 def key_callback(key:int):
-    global plk,frame_time
+    global plk,frame_time,key_id,last_key_id,terrain
     if key == glfw.KEY_LEFT_ALT:
         plk.record(frame_time)
         frame_time += 0.0303
@@ -53,18 +54,34 @@ def key_callback(key:int):
         mjcf.save(temp_k_path)
     if key == glfw.KEY_BACKSPACE:
         plk.reset_world()
+    if key == glfw.KEY_LEFT:
+        last_key_id = key_id
+        key_id -= 1
+        if key_id < 0:
+            key_id = terrain.n_points-1
+    if key == glfw.KEY_RIGHT:
+        last_key_id = key_id
+        key_id += 1
+        if key_id >= terrain.n_points:
+            key_id = 0
 
-
-with mujoco.viewer.launch_passive(plk.model, plk.data,key_callback=key_callback) as mj_viewer:
-    while mj_viewer.is_running():
+# TODO 调整key 添加key过程状态描述,保存为mjcf并通过name描述key过程状态, key2npz功能增加,check_point_key模式的npz文件 加载给IK_motion_loader
+# 单线程mujoco测试:插值计算(并行通用计算),motion trace randmonize
+with mujoco.viewer.launch_passive(plk.model, plk.data,key_callback=key_callback) as viewer:
+    def draw_geom(type, size, pos, mat, rgba):
+        viewer.user_scn.ngeom += 1
+        geom = viewer.user_scn.geoms[viewer.user_scn.ngeom - 1]   
+        mujoco.mjv_initGeom(geom, type, size, pos, mat, rgba)
+    ngeom = viewer.user_scn.ngeom    
+    rgba = [0.0, 1.0, 0.0, 0.5]     
+    for pos in terrain.terrain_key_pos:
+        draw_geom(mujoco.mjtGeom.mjGEOM_SPHERE, [0.02, 0.0, 0.0], pos, [1, 0, 0, 0, 1, 0, 0, 0, 1], [1.0, 0.0, 0.0, 0.5])
+    
+    while viewer.is_running():
         plk.update()
         mujoco.mj_forward(plk.model, plk.data)
-        mj_viewer.sync()
+
+        viewer.user_scn.geoms[ngeom + last_key_id].rgba = [1.0, 0.0, 0.0, 0.5]
+        viewer.user_scn.geoms[ngeom + key_id].rgba = [0.0, 1.0, 0.0, 1.0]
+        viewer.sync()
         
-# # # 创建渲染器
-# viewer = mujoco_viewer.MujocoViewer(plk.model, plk.data)
-# # 模拟循环
-# while viewer.is_alive:
-#     plk.update()
-#     mujoco.mj_forward(plk.model, plk.data)
-#     viewer.render()
