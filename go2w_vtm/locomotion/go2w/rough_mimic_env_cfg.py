@@ -114,7 +114,7 @@ class UnitreeGo2WMimicEnvCfg(MimicEnvCfg):
         #                                             "mimic_high_platform":["jump"]
         #                                            }
         self.commands.motion.terrain_motion_map = {
-                                                    # "mimic_trench":["leap_k"],
+                                                    "mimic_trench":["leap_k"],
                                                     "mimic_high_platform":["climb_k"]
                                                    }
         self.commands.motion.debug_vis = False

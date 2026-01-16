@@ -99,15 +99,15 @@ class Go2WRoughMimicPPOGRURunnerCfg(RslRlOnPolicyRunnerCfg):
     max_iterations = 30000
     save_interval = 500
     experiment_name = "unitree_go2w_rough_mimic_gru"
-    empirical_normalization = True
-    policy = RslRlPpoActorCriticCfg(
+    empirical_normalization = False
+    policy = RslRlPpoActorCriticRecurrentCfg(
         init_noise_std=1.0,
         actor_hidden_dims=[1024, 512, 256, 128],
         critic_hidden_dims=[1024, 512, 256, 128],
         activation="elu",
         rnn_hidden_dim=256,
         rnn_num_layers=1,
-        activation="gru",
+        rnn_type="gru",
     )
     algorithm = RslRlPpoAlgorithmCfg(
         value_loss_coef=1.0,
