@@ -36,12 +36,12 @@ from go2w_vtm.terrains import ConfirmTerrainImporterCfg
 ##
 
 VELOCITY_RANGE = {
-    "x": (-0.5, 0.5),
-    "y": (-0.5, 0.5),
-    "z": (-0.2, 0.2),
-    "roll": (-0.52, 0.52),
-    "pitch": (-0.52, 0.52),
-    "yaw": (-0.78, 0.78),
+    "x": (-0.1, 0.1),
+    "y": (-0.1, 0.1),
+    "z": (-0.1, 0.1),
+    "roll": (-0.3, 0.3),
+    "pitch": (-0.3, 0.3),
+    "yaw": (-0.3, 0.3),
 }
 
 @configclass

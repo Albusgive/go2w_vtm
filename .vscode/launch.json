@@ -230,7 +230,38 @@
                 // "--load_run",
                 // "2026-01-10_20-44-56",
                 "--checkpoint",
-                "/home/albusgive2/go2w_vtm/logs/rsl_rl/unitree_go2w_rough_mimic/2026-01-13_18-50-00/model_10500.pt"
+                "/home/albusgive2/go2w_vtm/logs/rsl_rl/unitree_go2w_rough_mimic/2026-01-15_22-24-24/model_3500.pt"
+            ],
+        },
+        {
+            "name": "Go2W-MIMIC-GRU-Rough",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "../go2w_vtm/go2w_vtm/scripts/mimic_train.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--task",
+                "Rough-Mimic-GRU-Unitree-Go2W",
+                // "--headless",
+                "--num_envs",
+                "20",
+            ],
+        },
+        {
+            "name": "Go2W-MIMIC-GRU-Rough-Play",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "../go2w_vtm/go2w_vtm/scripts/mimic_play.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--task",
+                "Rough-Mimic-GRU-Unitree-Go2W",
+                "--num_envs",
+                "20",
+                // "--load_run",
+                // "2026-01-10_20-44-56",
+                "--checkpoint",
+                "/home/albusgive2/go2w_vtm/logs/rsl_rl/unitree_go2w_rough_mimic/2026-01-15_22-24-24/model_3500.pt"
             ],
         },
         {

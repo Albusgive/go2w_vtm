@@ -97,6 +97,7 @@ class PlanningKeyframe:
         self.nkey = 0
         self.is_normal_mode = True 
         self.change_key = False
+        self.preset_labels = ["smooth", "jump", "jump_pre","start","end"]
         
         # 解析地形
         self.terrain = DecodeTerrain(self.model)
@@ -194,7 +195,7 @@ class PlanningKeyframe:
         # 弹出 UI
         dialog = ProportionalKeyframeDialog(
             default_time=default_time,
-            preset_labels=["smooth", "jump", "force"],
+            preset_labels=self.preset_labels,
             window_title="Record Keyframe for IK",
             scale_factor = 4.0,
         )

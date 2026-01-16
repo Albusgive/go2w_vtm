@@ -39,7 +39,6 @@ cfg.orientation_cost = 0.6
 plk = IK_and_savekey.PlanningKeyframe(temp_k_path,cfg,save_key_path=go2w_vtm.GO2W_MJCF_DIR,save_key_name="terrain_k") # mink
 hz = 50
 plk.run_interpolation_and_store(go2w_vtm.GO2W_MJCF_DIR + "/terrain_k.npz",(1.0,0.0,0.0),hz)
-# plk.is_normal_mode = True
 with mujoco.viewer.launch_passive(plk.model, plk.data,key_callback=plk.key_callback,
                                   show_left_ui=False,show_right_ui=False) as viewer:
     plk.draw_terrain_key_pos(viewer)
@@ -54,4 +53,6 @@ with mujoco.viewer.launch_passive(plk.model, plk.data,key_callback=plk.key_callb
         end_time = time.time()
         time.sleep(max(0,1.0/hz - (end_time - start_time)))
         viewer.sync()
+
+plk.save_keyframe(save_path = go2w_vtm.GO2W_MJCF_DIR + "/terrain_k_interpolated.xml")
         

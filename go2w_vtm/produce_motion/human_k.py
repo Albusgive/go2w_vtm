@@ -36,7 +36,7 @@ cfg = IK_and_savekey.mink_cfg("base_link",anchor,anchor_ref)
 cfg.orientation_cost = 0.6
 
 plk = IK_and_savekey.PlanningKeyframe(temp_k_path,cfg,save_key_path=go2w_vtm.GO2W_MJCF_DIR,save_key_name="terrain_k") # mink
-# plk.load_relative_npz(go2w_vtm.GO2W_MJCF_DIR + "/terrain_k.npz")
+plk.load_relative_npz(go2w_vtm.GO2W_MJCF_DIR + "/terrain_k.npz")
 # plk.sync_from_model_keys()
 
 # TODO 调整key 添加key过程状态描述,保存为mjcf并通过name描述key过程状态, key2npz功能增加,check_point_key模式的npz文件 加载给IK_motion_loader
