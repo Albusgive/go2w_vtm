@@ -5,3 +5,10 @@ go2w_vtm/__pycache__/
 go2w_vtm/locomotion/__pycache__/
 go2w_vtm/locomotion/go2w/__pycache__/
 go2w_vtm/locomotion/mdp/__pycache__/
+go2w_vtm/locomotion/go2w/agents/__pycache__/
+go2w_vtm/Robot/__pycache__/
+go2w_vtm/locomotion/go2w/agents/__pycache__/
+go2w_vtm/produce_motion/__pycache__/
+go2w_vtm/terrains/__pycache__/
+go2w_vtm/utils/__pycache__/
+

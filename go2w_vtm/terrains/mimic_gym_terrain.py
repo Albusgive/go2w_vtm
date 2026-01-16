@@ -21,6 +21,7 @@ def save_terrain_as_mjcf_with_stl(
     origin: np.ndarray,
     difficulty: float = 0.0,
     terrain_key_pos_list: list[np.ndarray] = None,
+    descriptions: list[str] = None,
     rgba: str = "0.8 0.6 0.4 1",
 ) -> None:
     """
@@ -100,7 +101,7 @@ def save_terrain_as_mjcf_with_stl(
         for i,pos in enumerate(terrain_key_pos_list):
             _pos = pos - origin
             text_elem = ET.SubElement(custom, "text")
-            text_elem.set("name", f"terrain_key_pos{i}")
+            text_elem.set("name", f"terrain_key_pos{i}:{descriptions[i]}")
             text_elem.set("data", f"{_pos[0]} {_pos[1]} {_pos[2]}")
     
 
@@ -255,18 +256,18 @@ def high_platform_terrain(difficulty: float, cfg: mimic_gym_terrain_cfg.MimicHig
     return meshes_list, origin
 
 
-''' 全新地形 '''
 
+''' 全新地形 '''
 def box_trench_terrain(difficulty: float, cfg: mimic_gym_terrain_cfg.BoxTrenchTerrainCfg) -> np.ndarray:
     """
-    生成两块box
+    生成两块box的沟壑
     """
     #计算沟壑宽度 trench_width range*difficulty
     trench_width = cfg.trench_width[0] + (cfg.trench_width[1] - cfg.trench_width[0]) * difficulty
-    box1_x_width = cfg.trench_x+cfg.robot_origin_x
-    trench_x_max = box1_x_width + trench_width
-    if cfg.size[0] < trench_x_max:
-        raise ValueError("trench_x + trench_width must be less than size[0].")
+    box1_x_width = cfg.terrain_x+cfg.robot_origin_x
+    terrain_x_max = box1_x_width + trench_width
+    if cfg.size[0] < terrain_x_max:
+        raise ValueError("terrain_x + trench_width must be less than size[0].")
     
     # 初始化网格列表
     meshes_list = []
@@ -282,14 +283,152 @@ def box_trench_terrain(difficulty: float, cfg: mimic_gym_terrain_cfg.BoxTrenchTe
     meshes_list.append(box1)
     
     
-    box2_extents = [cfg.size[0]-trench_x_max, cfg.size[1], cfg.trench_depth]
-    box2_center_pos = [box2_extents[0]/2+trench_x_max, cfg.size[1]/2, -box2_extents[2]/2]
+    box2_extents = [cfg.size[0]-terrain_x_max, cfg.size[1], cfg.trench_depth]
+    box2_center_pos = [box2_extents[0]/2+terrain_x_max, cfg.size[1]/2, -box2_extents[2]/2]
     box2 = trimesh.creation.box(extents=box2_extents)
     box2.apply_translation(box2_center_pos)
     meshes_list.append(box2)
 
-    terrain_check_point_list = cfg.make_check_points(difficulty)
+    terrain_check_point_list,descriptions = cfg.make_check_points(difficulty)
     save_terrain_as_mjcf_with_stl(cfg=cfg, meshes_list=meshes_list, origin=origin, 
-                                  difficulty=difficulty,terrain_key_pos_list=terrain_check_point_list)
+                                  difficulty=difficulty,
+                                  terrain_key_pos_list=terrain_check_point_list,
+                                  descriptions=descriptions)
+
+    return meshes_list, origin
+
+
+def box_platform_terrain(difficulty: float, cfg: mimic_gym_terrain_cfg.BoxHighPlatformTerrainCfg) -> np.ndarray:
+    """
+    生成两块box的地面和高台
+    """
+    #计算沟壑宽度 platform_width range*difficulty
+    terrain_x_min = cfg.terrain_x+cfg.robot_origin_x
+    if cfg.size[0] < terrain_x_min:
+        raise ValueError("size[0] must be greater than terrain_x + robot_origin_x.")
+    
+    # 初始化网格列表
+    meshes_list = []
+    
+    # -- 定义机器人出生点 --
+    terrain_center = np.array([0.5 * cfg.size[0], 0.5 * cfg.size[1]])
+    origin = np.array([cfg.robot_origin_x, terrain_center[1], 0.05]) # 稍高于平台
+
+    # 地面
+    box1_extents = [cfg.size[0], cfg.size[1], 0.2]
+    box1_center_pos = [cfg.size[0]/2, cfg.size[1]/2, -box1_extents[2]/2]
+    box1 = trimesh.creation.box(extents=box1_extents)
+    box1.apply_translation(box1_center_pos)
+    meshes_list.append(box1)
+    
+    # 高台
+    platform_height = cfg.platform_height[0] + (cfg.platform_height[1] - cfg.platform_height[0]) * difficulty
+    box2_extents = [cfg.size[0]-terrain_x_min, cfg.size[1], platform_height]
+    box2_center_pos = [box2_extents[0]/2+terrain_x_min, cfg.size[1]/2, box2_extents[2]/2]
+    box2 = trimesh.creation.box(extents=box2_extents)
+    box2.apply_translation(box2_center_pos)
+    meshes_list.append(box2)
+
+    terrain_check_point_list,descriptions = cfg.make_check_points(difficulty)
+    save_terrain_as_mjcf_with_stl(cfg=cfg, meshes_list=meshes_list, origin=origin, 
+                                  difficulty=difficulty,
+                                  terrain_key_pos_list=terrain_check_point_list,
+                                  descriptions=descriptions)
+
+
+    return meshes_list, origin
+
+
+def box_rock_fissure_terrain(difficulty: float, cfg: mimic_gym_terrain_cfg.BoxRockFissureTerrainCfg) -> np.ndarray:
+    """
+    三块box组成的地面和垂直狭缝
+    """
+    #计算沟壑宽度 platform_width range*difficulty
+    terrain_x_min = cfg.terrain_x + cfg.robot_origin_x
+    if cfg.size[0] < terrain_x_min:
+        raise ValueError("size[0] must be greater than terrain_x + robot_origin_x.")
+    
+    # 初始化网格列表
+    meshes_list = []
+
+    # -- 定义机器人出生点 --
+    terrain_center = np.array([0.5 * cfg.size[0], 0.5 * cfg.size[1]])
+    origin = np.array([cfg.robot_origin_x, terrain_center[1], 0.05]) # 稍高于平台
+
+    # 地面
+    box1_extents = [cfg.size[0], cfg.size[1], 0.2]
+    box1_center_pos = [cfg.size[0]/2, cfg.size[1]/2, -box1_extents[2]/2]
+    box1 = trimesh.creation.box(extents=box1_extents)
+    box1.apply_translation(box1_center_pos)
+    meshes_list.append(box1)
+
+    # 左侧box
+    rock_fissure_width = cfg.rock_fissure_width[0] + (cfg.rock_fissure_width[1] - cfg.rock_fissure_width[0]) * difficulty
+    box_y_size = (cfg.size[1] - rock_fissure_width)/2
+    box_x_size = cfg.rock_fissure_long
+    
+    left_box_extents = [box_x_size, box_y_size, cfg.rock_fissure_height]
+    left_box_center_pos = [terrain_x_min+box_x_size/2, box_y_size*3/2 + rock_fissure_width, left_box_extents[2]/2]
+    left_box = trimesh.creation.box(extents=left_box_extents)
+    left_box.apply_translation(left_box_center_pos)
+    meshes_list.append(left_box)
+    
+    right_box_extents = [box_x_size, box_y_size, cfg.rock_fissure_height]
+    right_box_center_pos = [terrain_x_min+box_x_size/2, box_y_size/2 , right_box_extents[2]/2]
+    right_box = trimesh.creation.box(extents=right_box_extents)
+    right_box.apply_translation(right_box_center_pos)
+    meshes_list.append(right_box)
+
+    terrain_check_point_list,descriptions = cfg.make_check_points(difficulty)
+    save_terrain_as_mjcf_with_stl(cfg=cfg, meshes_list=meshes_list, origin=origin, 
+                                  difficulty=difficulty,
+                                  terrain_key_pos_list=terrain_check_point_list,
+                                  descriptions=descriptions)
+
+
+    return meshes_list, origin
+
+
+def box_float_box_terrain(difficulty: float, cfg: mimic_gym_terrain_cfg.BoxFloatBoxTerrainCfg) -> np.ndarray:
+    """
+    两块box组成的地面和悬空box
+    """
+    #计算沟壑宽度 platform_width range*difficulty
+    terrain_x_min = cfg.terrain_x + cfg.robot_origin_x
+    if cfg.size[0] < terrain_x_min:
+        raise ValueError("size[0] must be greater than terrain_x + robot_origin_x.")
+    
+    # 初始化网格列表
+    meshes_list = []
+
+    # -- 定义机器人出生点 --
+    terrain_center = np.array([0.5 * cfg.size[0], 0.5 * cfg.size[1]])
+    origin = np.array([cfg.robot_origin_x, terrain_center[1], 0.05]) # 稍高于平台
+
+    # 地面
+    box1_extents = [cfg.size[0], cfg.size[1], 0.2]
+    box1_center_pos = [cfg.size[0]/2, cfg.size[1]/2, -box1_extents[2]/2]
+    box1 = trimesh.creation.box(extents=box1_extents)
+    box1.apply_translation(box1_center_pos)
+    meshes_list.append(box1)
+
+    # float box
+    float_box_float_height = cfg.float_box_float_height[0] + (cfg.float_box_float_height[1] - cfg.float_box_float_height[0]) * difficulty
+    # 随机float_box_height
+    float_box_height = np.random.uniform(low=cfg.float_box_height[0], high=cfg.float_box_height[1])
+    
+    float_box_extents = [cfg.float_box_long, cfg.size[1], float_box_height]
+    float_box_center_pos = [terrain_x_min+float_box_extents[0]/2,cfg.size[1]/2, float_box_float_height+float_box_extents[2]/2]
+    float_box = trimesh.creation.box(extents=float_box_extents)
+    float_box.apply_translation(float_box_center_pos)
+    meshes_list.append(float_box)
+    
+
+    terrain_check_point_list,descriptions = cfg.make_check_points(difficulty)
+    save_terrain_as_mjcf_with_stl(cfg=cfg, meshes_list=meshes_list, origin=origin, 
+                                  difficulty=difficulty,
+                                  terrain_key_pos_list=terrain_check_point_list,
+                                  descriptions=descriptions)
+
 
     return meshes_list, origin

@@ -1,0 +1,19 @@
+<mujoco model="test_box_platform_terrain">
+  <asset>
+    <mesh name="test_box_platform_terrain_mesh0" file="meshs/test_box_platform_terrain_mesh0.stl"/>
+    <mesh name="test_box_platform_terrain_mesh1" file="meshs/test_box_platform_terrain_mesh1.stl"/>
+  </asset>
+  <worldbody>
+    <geom type="mesh" mesh="test_box_platform_terrain_mesh0" rgba="0.8 0.6 0.4 1" pos="-0.8 -1.5 -0.05" contype="1" conaffinity="1" group="1"/>
+    <geom type="mesh" mesh="test_box_platform_terrain_mesh1" rgba="0.8 0.6 0.4 1" pos="-0.8 -1.5 -0.05" contype="1" conaffinity="1" group="1"/>
+  </worldbody>
+  <custom>
+    <text name="terrain:test_box_platform_terrain" data="difficulty:0.9556766994147523"/>
+    <text name="terrain_key_pos0:init" data="0.0 0.0 -0.05"/>
+    <text name="terrain_key_pos1:platform_edge" data="0.8999999999999999 0.0 -0.05"/>
+    <text name="terrain_key_pos2:platform_edge front leg up" data="0.8999999999999999 0.0 0.05"/>
+    <text name="terrain_key_pos3:platform_up_edge back leg up" data="1.0 0.0 0.3889191748536881"/>
+    <text name="terrain_key_pos4:platform_up_edge leg down" data="1.1 0.0 0.3889191748536881"/>
+    <text name="terrain_key_pos5:end" data="1.4999999999999998 0.0 0.3889191748536881"/>
+  </custom>
+</mujoco>

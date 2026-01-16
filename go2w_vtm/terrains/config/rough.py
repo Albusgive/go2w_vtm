@@ -217,7 +217,7 @@ CONFIRM_TERRAIN_CFG = ConfirmTerrainGeneratorCfg(
 
 
 CONFIRM_TERRAIN_CFG2 = ConfirmTerrainGeneratorCfg(
-    size=(3, 2.5),
+    size=(5, 3.0),
     border_width=20.0,
     num_rows=5,
     num_cols=10,
@@ -225,13 +225,13 @@ CONFIRM_TERRAIN_CFG2 = ConfirmTerrainGeneratorCfg(
     vertical_scale=0.005,
     slope_threshold=0.75,
     use_cache=False,
-    curriculum=True,
+    curriculum=True, # 要开
     # color_scheme="random",
     sub_terrains={
-        "test_mimic_trench": terrain_gen.BoxTrenchTerrainCfg(
+        "test_box_trench_terrain": terrain_gen.BoxTrenchTerrainCfg(
             # proportion=0.5, 
             
-            trench_x = 1.0,                                  
+            terrain_x = 1.0,                                  
             trench_width = (0.2,0.45),
             trench_depth = 1.5,
             
@@ -241,10 +241,57 @@ CONFIRM_TERRAIN_CFG2 = ConfirmTerrainGeneratorCfg(
             mesh_path = go2w_vtm.GO2W_MJCF_DIR + "/meshs/",
             mjcf_path = go2w_vtm.GO2W_MJCF_DIR,
             
-            init_key_pos_distance = 0.5,
-            end_key_pos_distance = 0.3,
+            terrain_name = "test_box_trench_terrain"
+        ),
+        "test_box_platform_terrain": terrain_gen.BoxHighPlatformTerrainCfg(
+            # proportion=0.5, 
             
-            terrain_name = "test_trench_box_terrain"
+            terrain_x = 1.0,                                  
+            platform_width = 1.0,
+            platform_height = (0.2,0.45),
+            
+            robot_origin_x = 0.8,
+                
+            save_to_mjcf = True,
+            mesh_path = go2w_vtm.GO2W_MJCF_DIR + "/meshs/",
+            mjcf_path = go2w_vtm.GO2W_MJCF_DIR,
+            
+            
+            terrain_name = "test_box_platform_terrain"
+        ),
+        
+        "test_box_rock_fissure_terrain": terrain_gen.BoxRockFissureTerrainCfg(
+            # proportion=0.5, 
+            
+            terrain_x = 1.5,                                  
+            rock_fissure_long = 0.6,
+            rock_fissure_width = (0.3,0.35),
+            rock_fissure_height = 1.0,
+            
+            robot_origin_x = 0.8,
+                
+            save_to_mjcf = True,
+            mesh_path = go2w_vtm.GO2W_MJCF_DIR + "/meshs/",
+            mjcf_path = go2w_vtm.GO2W_MJCF_DIR,
+            
+            terrain_name = "test_box_rock_fissure_terrain"
+        ),
+        
+        "test_box_float_box_terrain": terrain_gen.BoxFloatBoxTerrainCfg(
+            # proportion=0.5, 
+            
+            terrain_x = 1.5,                                  
+            float_box_long = 1.0,
+            float_box_float_height = (0.3,0.4),
+            float_box_height = (0.1,0.35),
+            
+            robot_origin_x = 0.8,
+                
+            save_to_mjcf = True,
+            mesh_path = go2w_vtm.GO2W_MJCF_DIR + "/meshs/",
+            mjcf_path = go2w_vtm.GO2W_MJCF_DIR,
+            
+            terrain_name = "test_box_float_box_terrain"
         ),
     }
 )

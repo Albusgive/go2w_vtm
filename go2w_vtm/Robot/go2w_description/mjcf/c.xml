@@ -1,0 +1,22 @@
+<mujoco model="test_box_rock_fissure_terrain">
+  <asset>
+    <mesh name="test_box_rock_fissure_terrain_mesh0" file="meshs/test_box_rock_fissure_terrain_mesh0.stl"/>
+    <mesh name="test_box_rock_fissure_terrain_mesh1" file="meshs/test_box_rock_fissure_terrain_mesh1.stl"/>
+    <mesh name="test_box_rock_fissure_terrain_mesh2" file="meshs/test_box_rock_fissure_terrain_mesh2.stl"/>
+  </asset>
+  <worldbody>
+    <geom type="mesh" mesh="test_box_rock_fissure_terrain_mesh0" rgba="0.8 0.6 0.4 1" pos="-0.8 -1.0 -0.05" contype="1" conaffinity="1" group="1"/>
+    <geom type="mesh" mesh="test_box_rock_fissure_terrain_mesh1" rgba="0.8 0.6 0.4 1" pos="-0.8 -1.0 -0.05" contype="1" conaffinity="1" group="1"/>
+    <geom type="mesh" mesh="test_box_rock_fissure_terrain_mesh2" rgba="0.8 0.6 0.4 1" pos="-0.8 -1.0 -0.05" contype="1" conaffinity="1" group="1"/>
+  </worldbody>
+  <custom>
+    <text name="terrain:test_box_rock_fissure_terrain" data="difficulty:0.933962798936502"/>
+    <text name="terrain_key_pos0:init" data="0.0 0.0 -0.05"/>
+    <text name="terrain_key_pos1:rock_fissure_edge" data="1.3999999999999997 0.0 -0.05"/>
+    <text name="terrain_key_pos2:rock_fissure_edge turn" data="1.4999999999999998 0.0 -0.05"/>
+    <text name="terrain_key_pos3:rock_fissure_edge enter" data="1.5999999999999999 0.0 -0.05"/>
+    <text name="terrain_key_pos4:rock_fissure_edge turn" data="1.7999999999999996 0.0 -0.05"/>
+    <text name="terrain_key_pos5:rock_fissure_edge exit" data="1.7999999999999996 0.0 -0.05"/>
+    <text name="terrain_key_pos6:end" data="1.8999999999999997 0.0 -0.05"/>
+  </custom>
+</mujoco>

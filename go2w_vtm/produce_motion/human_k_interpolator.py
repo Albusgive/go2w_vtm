@@ -37,7 +37,7 @@ cfg = IK_and_savekey.mink_cfg("base_link",anchor,anchor_ref)
 cfg.orientation_cost = 0.6
 
 plk = IK_and_savekey.PlanningKeyframe(temp_k_path,cfg,save_key_path=go2w_vtm.GO2W_MJCF_DIR,save_key_name="terrain_k") # mink
-hz = 50
+hz = 100
 plk.run_interpolation_and_store(go2w_vtm.GO2W_MJCF_DIR + "/terrain_k.npz",(1.0,0.0,0.0),hz)
 with mujoco.viewer.launch_passive(plk.model, plk.data,key_callback=plk.key_callback,
                                   show_left_ui=False,show_right_ui=False) as viewer:

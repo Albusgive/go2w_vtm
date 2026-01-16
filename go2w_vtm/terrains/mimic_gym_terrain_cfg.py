@@ -27,6 +27,10 @@ class SaveTerrainCfg(SubTerrainBaseCfg):
     mjcf_path: str = None
     terrain_name: str = MISSING
     
+    ''' 机器人x坐标 '''
+    terrain_x: float = MISSING  
+    robot_origin_x: float = 1.5
+    
     def make_check_points(self, difficulty: float):
         return None
     
@@ -67,32 +71,101 @@ class BoxTrenchTerrainCfg(SaveTerrainCfg):
     ''' 两块box组成的沟壑 '''
     function = mimic_gym_terrain.box_trench_terrain
     
-    ''' 在机器人面前 trench_x位置为沟壑边缘 宽度为trench_width'''
-    trench_x: float = MISSING                                   
+    ''' 在机器人面前 trench_x位置为沟壑边缘(距离机器人) 宽度为trench_width'''                                 
     trench_width: tuple[float, float] = MISSING  #宽度范围
     trench_depth: float = MISSING
     
-    
-    ''' 机器人x坐标 '''
-    robot_origin_x: float = 1.5
-    
-    terrain_name: str = "trench_box_terrain"
+    terrain_name: str = "box_trench_terrain"
     
     ''' 自动计算中间key_pos 然后k帧数据保存key_name和相对于key的pos 
-    返回的为 terrain_key_pos_list 为 terrain 坐标系,即原点在右下'''
+    返回的为 terrain_key_pos_list 为 terrain 坐标系,即原点在右下
+    '''
     def make_check_points(self, difficulty: float) ->list[np.ndarray]:
         from . import make_terrain_check_point
         return make_terrain_check_point.makeBoxTrenchTerrainCheckPoint(
             difficulty=difficulty,
             size=self.size,
-            trench_x=self.trench_x,
-            trench_width=self.trench_width,
+            terrain_x=self.terrain_x,
             robot_origin_x=self.robot_origin_x,
-            init_key_pos_distance=self.init_key_pos_distance,
-            end_key_pos_distance=self.end_key_pos_distance)
+            trench_width=self.trench_width)
     
-    init_key_pos_distance: float = 0.1 # 距离跳跃前沟壑边缘的距离
-    end_key_pos_distance: float = 0.1 # 距离跳跃后沟壑边缘的距离
     
+@configclass
+class BoxHighPlatformTerrainCfg(SaveTerrainCfg):
+    ''' 两块box组成的地面和平台 '''
+    function = mimic_gym_terrain.box_platform_terrain
+    
+    ''' 在机器人面前 terrain_x 位置为平台边缘(距离机器人) 宽度为platform_width'''                                 
+    platform_width: float = MISSING  #宽度
+    platform_height: tuple[float, float] = MISSING #高度范围
+    
+    
+    terrain_name: str = "box_platform_terrain"
+    
+    ''' 自动计算中间key_pos 然后k帧数据保存key_name和相对于key的pos 
+    返回的为 terrain_key_pos_list 为 terrain 坐标系,即原点在右下'''
+    def make_check_points(self, difficulty: float) ->list[np.ndarray]:
+        from . import make_terrain_check_point
+        return make_terrain_check_point.makeBoxHighPlatformTerrainCheckPoint(
+            difficulty=difficulty,
+            size=self.size,
+            terrain_x=self.terrain_x,
+            robot_origin_x=self.robot_origin_x,
+            platform_width=self.platform_width,
+            platform_height=self.platform_height,)
+
     
 
+@configclass
+class BoxRockFissureTerrainCfg(SaveTerrainCfg):
+    ''' 三块box组成的地面和垂直狭缝 rock_fissure'''
+    function = mimic_gym_terrain.box_rock_fissure_terrain
+    
+    ''' 在机器人面前 terrain_x 位置为裂缝边缘(距离机器人) 宽度为platform_width'''
+         
+    rock_fissure_long: float = MISSING                     
+    rock_fissure_width: tuple[float, float] = MISSING  # 宽度范围
+    rock_fissure_height: float = MISSING #高度
+    
+    terrain_name: str = "box_rock_fissure_terrain"
+    
+    ''' 自动计算中间key_pos 然后k帧数据保存key_name和相对于key的pos 
+    返回的为 terrain_key_pos_list 为 terrain 坐标系,即原点在右下'''
+    def make_check_points(self, difficulty: float) ->list[np.ndarray]:
+        from . import make_terrain_check_point
+        return make_terrain_check_point.makeBoxRockFissureTerrainCheckPoint(
+            difficulty=difficulty,
+            size=self.size,
+            terrain_x=self.terrain_x,
+            robot_origin_x=self.robot_origin_x,
+            rock_fissure_long=self.rock_fissure_long,
+            rock_fissure_width=self.rock_fissure_width,
+            rock_fissure_height=self.rock_fissure_height,)
+
+    
+    
+@configclass
+class BoxFloatBoxTerrainCfg(SaveTerrainCfg):
+    ''' 两块box组成的地面和悬空box '''
+    function = mimic_gym_terrain.box_float_box_terrain
+
+    ''' 在机器人面前 terrain_x 位置为float box边缘(距离机器人) 宽度为platform_width''' 
+    float_box_long: float = MISSING   # 地形长度
+    float_box_float_height: tuple[float, float] = MISSING #悬浮高度 
+    float_box_height: tuple[float, float] = MISSING #高度 随机
+    
+    
+    terrain_name: str = "box_float_box_terrain"
+    
+    ''' 自动计算中间key_pos 然后k帧数据保存key_name和相对于key的pos 
+    返回的为 terrain_key_pos_list 为 terrain 坐标系,即原点在右下'''
+    def make_check_points(self, difficulty: float) ->list[np.ndarray]:
+        from . import make_terrain_check_point
+        return make_terrain_check_point.makeBoxFloatBoxTerrainCheckPoint(
+            difficulty=difficulty,
+            size=self.size,
+            terrain_x=self.terrain_x,
+            robot_origin_x=self.robot_origin_x,
+            float_box_long=self.float_box_long,
+            float_box_float_height=self.float_box_float_height,
+            float_box_height=self.float_box_height,)
