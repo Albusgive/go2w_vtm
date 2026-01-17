@@ -120,9 +120,15 @@ class PlanningKeyframe:
         # 更新渲染
         self.viewer = None
         self.ngeom = 0
+        self.key_geom_start_idx = -1
         self.select_key_rgba = [0.0, 1.0, 0.0, 0.5]
         self.terrain_key_pos_rgba = [1.0, 0.0, 0.0, 0.5]
         
+        self.grid_geom_start_idx = -1
+        self.grid_geom_count = 0
+        self.grid_rgba = [0.0, 0.0, 0.0, 0.5]
+        self.close_grid = False
+        self.close_grid_update = False
     
     def key_callback(self,key:int):
         if key == glfw.KEY_LEFT_ALT:
@@ -147,17 +153,10 @@ class PlanningKeyframe:
             if self.key_id < 0:
                 self.key_id = self.nkey - 1
             self.change_key = True
-    
-    def draw_terrain_key_pos(self,viewer):
-        def draw_geom(type, size, pos, mat, rgba):
-            viewer.user_scn.ngeom += 1
-            geom = viewer.user_scn.geoms[viewer.user_scn.ngeom - 1]   
-            mujoco.mjv_initGeom(geom, type, size, pos, mat, rgba)
-        self.viewer = viewer
-        self.ngeom = viewer.user_scn.ngeom       
-        for pos in self.terrain.terrain_key_pos:
-            draw_geom(mujoco.mjtGeom.mjGEOM_SPHERE, [0.02, 0.0, 0.0], pos, [1, 0, 0, 0, 1, 0, 0, 0, 1], self.terrain_key_pos_rgba)
-    
+        if key == glfw.KEY_RIGHT_ALT:
+            self.close_grid = not self.close_grid
+            self.close_grid_update = True
+
             
     def update(self):
         if self.change_key:
@@ -185,8 +184,13 @@ class PlanningKeyframe:
         
         # update terrain key viewer
         if self.terrain.n_points > 0 and self.viewer is not None:
-            self.viewer.user_scn.geoms[self.ngeom + self.key_id_last].rgba = self.terrain_key_pos_rgba
-            self.viewer.user_scn.geoms[self.ngeom + self.key_id].rgba = self.select_key_rgba
+            self.viewer.user_scn.geoms[self.key_geom_start_idx + self.key_id_last].rgba = self.terrain_key_pos_rgba
+            self.viewer.user_scn.geoms[self.key_geom_start_idx + self.key_id].rgba = self.select_key_rgba
+        if self.close_grid_update:
+            rgba = [self.grid_rgba[0],self.grid_rgba[1],self.grid_rgba[2],self.grid_rgba[3]]
+            if self.close_grid:
+                rgba[3] = 0.0
+            self.update_grid_color(rgba)
 
     
     '''    记录，保存，回放，插帧   '''
@@ -431,3 +435,132 @@ class PlanningKeyframe:
         self.change_key = True
         
         print(f"✅ Generated {self.nkey} frames. Ready for playback.")
+
+
+    ''' 渲染 '''
+    def draw_terrain_key_pos(self,viewer):
+        def draw_geom(type, size, pos, mat, rgba):
+            viewer.user_scn.ngeom += 1
+            geom = viewer.user_scn.geoms[viewer.user_scn.ngeom - 1]   
+            mujoco.mjv_initGeom(geom, type, size, pos, mat, rgba)
+        if self.viewer is None:
+            self.viewer = viewer
+        self.ngeom = viewer.user_scn.ngeom       
+        self.key_geom_start_idx = self.ngeom
+        for pos in self.terrain.terrain_key_pos:
+            draw_geom(mujoco.mjtGeom.mjGEOM_SPHERE, [0.02, 0.0, 0.0], pos, [1, 0, 0, 0, 1, 0, 0, 0, 1], self.terrain_key_pos_rgba)
+        
+
+    def create_static_grid(self, viewer, 
+                           resolution=1.0, 
+                           scale=1.0, 
+                           rgba=[0.5, 0.5, 0.5, 0.1], 
+                           line_thickness=0.01):
+        """
+        在场景 AABB 范围内绘制 3D 网格。
+        resolution: 网格间距 (米)
+        scale: 对包围盒的缩放比例
+        line_thickness: 圆柱体线宽
+        """
+        if self.model.ngeom == 0:
+            return
+
+        # 1. 计算原始 AABB 边界 (逻辑同前)
+        global_min = np.array([np.inf, np.inf, np.inf])
+        global_max = np.array([-np.inf, -np.inf, -np.inf])
+        self.grid_rgba = rgba
+        if self.viewer is None:
+            self.viewer = viewer
+        
+        for i in range(self.model.ngeom):
+            # 过滤掉地板，否则网格会变得无限大
+            if self.model.geom_type[i] == mujoco.mjtGeom.mjGEOM_PLANE:
+                continue
+            
+            local_center = self.model.geom_aabb[i, :3]
+            local_half_size = self.model.geom_aabb[i, 3:]
+            pos = self.model.geom_pos[i]
+            quat = self.model.geom_quat[i]
+            mat = np.zeros(9); mujoco.mju_quat2Mat(mat, quat); mat = mat.reshape(3, 3)
+            
+            offsets = np.array([[i, j, k] for i in [-1, 1] for j in [-1, 1] for k in [-1, 1]])
+            local_vertices = local_center + offsets * local_half_size
+            world_vertices = pos + (mat @ local_vertices.T).T
+            global_min = np.minimum(global_min, np.min(world_vertices, axis=0))
+            global_max = np.maximum(global_max, np.max(world_vertices, axis=0))
+
+        # 2. 应用缩放 (Scale)
+        center = (global_max + global_min) / 2.0
+        half_size = ((global_max - global_min) / 2.0) * scale
+        g_min, g_max = center - half_size, center + half_size
+
+        # 3. 记录起始索引
+        self.grid_geom_start_idx = viewer.user_scn.ngeom
+        initial_ngeom = viewer.user_scn.ngeom
+
+        # 4. 生成网格线坐标
+        # 我们需要在 X, Y, Z 三个方向分别画线
+        xs = np.arange(g_min[0], g_max[0] + resolution, resolution)
+        ys = np.arange(g_min[1], g_max[1] + resolution, resolution)
+        zs = np.arange(g_min[2], g_max[2] + resolution, resolution)
+
+        def add_line(p1, p2):
+            if viewer.user_scn.ngeom >= viewer.user_scn.maxgeom:
+                return
+            geom = viewer.user_scn.geoms[viewer.user_scn.ngeom]
+            # 计算圆柱体的位姿：中心点，长度，旋转
+            mid_point = (p1 + p2) / 2.0
+            direction = p2 - p1
+            length = np.linalg.norm(direction)
+            
+            # 默认圆柱体沿 Z 轴，需要旋转到 direction 方向
+            z_axis = np.array([0, 0, 1])
+            target_dir = direction / (length + 1e-6)
+            
+            # 计算旋转矩阵 (将 Z 轴对齐到 target_dir)
+            rot_mat = np.eye(3)
+            if not np.allclose(target_dir, z_axis):
+                v = np.cross(z_axis, target_dir)
+                c = np.dot(z_axis, target_dir)
+                s = np.linalg.norm(v)
+                kmat = np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
+                rot_mat = np.eye(3) + kmat + kmat.dot(kmat) * ((1 - c) / (s**2 + 1e-6))
+
+            mujoco.mjv_initGeom(
+                geom,
+                type=mujoco.mjtGeom.mjGEOM_CYLINDER,
+                size=np.array([line_thickness, length / 2.0, 0]),
+                pos=mid_point,
+                mat=rot_mat.flatten(),
+                rgba=rgba
+            )
+            viewer.user_scn.ngeom += 1
+
+        # 绘制沿 X 方向的线 (固定 Y, Z)
+        for y in ys:
+            for z in zs:
+                add_line(np.array([g_min[0], y, z]), np.array([g_max[0], y, z]))
+
+        # 绘制沿 Y 方向的线 (固定 X, Z)
+        for x in xs:
+            for z in zs:
+                add_line(np.array([x, g_min[1], z]), np.array([x, g_max[1], z]))
+
+        # 绘制沿 Z 方向的线 (固定 X, Y)
+        for x in xs:
+            for y in ys:
+                add_line(np.array([x, y, g_min[2]]), np.array([x, y, g_max[2]]))
+        # 5. 记录总数
+        self.grid_geom_count = viewer.user_scn.ngeom - initial_ngeom
+
+    def update_grid_color(self, new_rgba):
+        """
+        快速修改已绘制网格的颜色
+        """
+        if self.grid_geom_start_idx == -1:
+            return
+        
+        for i in range(self.grid_geom_count):
+            idx = self.grid_geom_start_idx + i
+            if idx < self.viewer.user_scn.maxgeom:
+                self.viewer.user_scn.geoms[idx].rgba[:] = new_rgba

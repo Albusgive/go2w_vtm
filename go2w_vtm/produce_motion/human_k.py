@@ -14,7 +14,7 @@ from go2w_vtm.produce_motion.decode_terrain import DecodeTerrain
 
 file_path = go2w_vtm.GO2W_MJCF_DIR + "/go2w_mocap.xml"
 # test_box_float_box_terrain  test_box_platform_terrain test_box_rock_fissure_terrain test_box_trench_terrain 
-terrain_name = "test_box_trench_terrain"
+terrain_name = "test_box_platform_terrain"
 terrain_path = go2w_vtm.GO2W_MJCF_DIR + "/" + terrain_name + ".xml"
 terrain_k_path = go2w_vtm.GO2W_MJCF_DIR + "/" + terrain_name + "_k.xml"
 temp_path = go2w_vtm.GO2W_MJCF_DIR + "/temp.xml"
@@ -42,6 +42,7 @@ plk.load_relative_npz(go2w_vtm.GO2W_MJCF_DIR + "/" + terrain_name + "_k.npz")
 with mujoco.viewer.launch_passive(plk.model, plk.data,key_callback=plk.key_callback,
                                   show_left_ui=False,show_right_ui=False) as viewer:
     plk.draw_terrain_key_pos(viewer)
+    plk.create_static_grid(viewer,0.2,1.5,rgba=[0.5,0.5,0.5,0.2],line_thickness=0.005)
     while viewer.is_running():
         plk.update()
         mujoco.mj_forward(plk.model, plk.data)

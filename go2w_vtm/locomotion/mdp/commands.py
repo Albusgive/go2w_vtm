@@ -957,57 +957,76 @@ class MotionCommand(CommandTerm):
         if len(env_ids) == 0:
             return
 
+        # 1. 获取当前环境的状态
         episode_failed = self._env.termination_manager.terminated[env_ids]
         current_motion_ids = self.motion_ids[env_ids]  # [E]
 
+        # 2. 统计失败 (Update Failures)
         if torch.any(episode_failed):
-            # Compute normalized time (0～1) for each env
-            current_time_norm = self.time_steps[env_ids].float() / self.motion.time_step_totals[current_motion_ids].float()
-            # Map to bin index using global bin_count
+            # 获取每个 motion 实际的总时长，避免 padding 区域影响计算
+            motion_totals = self.motion.time_step_totals[current_motion_ids].float()
+            
+            # 计算归一化时间并映射到 Bin
+            current_time_norm = self.time_steps[env_ids].float() / motion_totals
             current_bin_index = (current_time_norm * self.bin_count).long().clamp(0, self.bin_count - 1)
 
-            # Accumulate failures per motion
+            # 筛选出失败的环境
             fail_mask = episode_failed
-            fail_motion_ids = current_motion_ids[fail_mask]      # [F]
-            fail_bins = current_bin_index[fail_mask]            # [F]
+            fail_motion_ids = current_motion_ids[fail_mask] # [F]
+            fail_bins = current_bin_index[fail_mask]       # [F]
 
-            # Use scatter_add to accumulate per motion per bin
-            self._current_bin_failed.zero_()
-            self._current_bin_failed.view(-1).index_add_(
-                0,
-                fail_motion_ids * self.bin_count + fail_bins,
-                torch.ones_like(fail_bins, dtype=torch.float)
-            )
+            # 只有当确实有失败发生时才更新
+            if fail_motion_ids.numel() > 0:
+                self._current_bin_failed.view(-1).index_add_(
+                    0,
+                    fail_motion_ids * self.bin_count + fail_bins,
+                    torch.ones_like(fail_bins, dtype=torch.float)
+                )
 
-        # Now sample per env based on its motion's failure stats
-        new_time_steps = torch.empty_like(self.time_steps[env_ids])
+        # 3. 采样新时间步 (Sample New Time Steps)
+        new_time_steps = torch.zeros_like(self.time_steps[env_ids]) # 默认为0
+        
+        # [优化点] 只遍历当前 envs 涉及到的 motion_id，极大提升稀疏情况下的性能
+        unique_mids = torch.unique(current_motion_ids)
 
-        # Group envs by motion_id
-        for mid in range(self.motion.num_motions):
-            mask = (current_motion_ids == mid)
-            if not mask.any():
-                continue
-
-            # Get failure stats for this motion
-            sampling_probs = self.bin_failed_count[mid] + self.cfg.adaptive_uniform_ratio / self.bin_count
-            sampling_probs = torch.nn.functional.pad(
-                sampling_probs.unsqueeze(0).unsqueeze(0),
+        for mid_tensor in unique_mids:
+            mid = mid_tensor.item()
+            mask = (current_motion_ids == mid) # 当前批次中属于该动作的环境掩码
+            
+            # --- 概率计算 ---
+            # 取出该动作的失败分布行
+            raw_probs = self.bin_failed_count[mid] + self.cfg.adaptive_uniform_ratio / self.bin_count
+            
+            # 卷积平滑 (Conv1d 需要 [1, 1, L] 格式)
+            padded_probs = torch.nn.functional.pad(
+                raw_probs.view(1, 1, -1),
                 (0, self.cfg.adaptive_kernel_size - 1),
                 mode="replicate"
             )
-            sampling_probs = torch.nn.functional.conv1d(sampling_probs, self.kernel.view(1, 1, -1)).view(-1)
-            sampling_probs = sampling_probs / sampling_probs.sum()
+            smoothed_probs = torch.nn.functional.conv1d(
+                padded_probs, self.kernel.view(1, 1, -1)
+            ).view(-1)
+            
+            # 归一化
+            prob_sum = smoothed_probs.sum()
+            if prob_sum > 1e-6:
+                sampling_probs = smoothed_probs / prob_sum
+            else:
+                # 极端情况兜底：均匀分布
+                sampling_probs = torch.ones_like(smoothed_probs) / self.bin_count
 
+            # --- 采样 ---
             n_sample = mask.sum().item()
             sampled_bins = torch.multinomial(sampling_probs, n_sample, replacement=True)
 
-            # Convert bin → time step (clamped to this motion's actual length)
+            # --- 映射回时间步 ---
             max_t = self.motion.time_step_totals[mid].item()
-            new_time_steps[mask] = (
-                (sampled_bins.float() + torch.rand(n_sample, device=self.device))
-                / self.bin_count
-                * (max_t - 1)
-            ).long().clamp(0, max_t - 1)
+            
+            # 连续化 + 缩放 + 截断
+            # 注意：这里使用 random 偏移让采样更平滑，不只停留在 bin 的左边界
+            t_float = (sampled_bins.float() + torch.rand(n_sample, device=self.device)) / self.bin_count * (max_t - 1)
+            
+            new_time_steps[mask] = t_float.long().clamp(0, max_t - 1)
 
         self.time_steps[env_ids] = new_time_steps
 

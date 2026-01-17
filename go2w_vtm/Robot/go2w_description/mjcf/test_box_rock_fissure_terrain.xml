@@ -10,7 +10,7 @@
     <geom type="mesh" mesh="test_box_rock_fissure_terrain_mesh2" rgba="0.8 0.6 0.4 1" pos="-0.8 -1.5 -0.05" contype="1" conaffinity="1" group="1"/>
   </worldbody>
   <custom>
-    <text name="terrain:test_box_rock_fissure_terrain" data="difficulty:0.933962798936502"/>
+    <text name="terrain:test_box_rock_fissure_terrain" data="difficulty:0.936609790648491"/>
     <text name="terrain_key_pos0:init" data="0.0 0.0 -0.05"/>
     <text name="terrain_key_pos1:rock_fissure_edge" data="1.3999999999999997 0.0 -0.05"/>
     <text name="terrain_key_pos2:rock_fissure_edge turn" data="1.4999999999999998 0.0 -0.05"/>

@@ -193,4 +193,5 @@ class TestUnitreeGo2WMimicEnvCfg(UnitreeGo2WMimicEnvCfg):
         #                                             "mimic_trench":["leap_k"],
         #                                             "mimic_high_platform":["climb_k"]
         #                                            }
-    
+
+

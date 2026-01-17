@@ -14,9 +14,11 @@ import time
 
 
 file_path = go2w_vtm.GO2W_MJCF_DIR + "/go2w_mocap.xml"
-terrain_path = go2w_vtm.GO2W_MJCF_DIR + "/test_trench_box_terrain.xml"
-load_key_path = go2w_vtm.GO2W_MJCF_DIR + "/terrain_k.xml"
-temp_k_path = go2w_vtm.GO2W_MJCF_DIR + "/temp_k.xml"
+# test_box_float_box_terrain  test_box_platform_terrain test_box_rock_fissure_terrain test_box_trench_terrain 
+terrain_name = "test_box_platform_terrain"
+terrain_path = go2w_vtm.GO2W_MJCF_DIR + "/" + terrain_name + ".xml"
+terrain_k_path = go2w_vtm.GO2W_MJCF_DIR + "/" + terrain_name + "_k.xml"
+temp_path = go2w_vtm.GO2W_MJCF_DIR + "/temp.xml"
 
 mjcf = MJCFEditor(file_path)
 mjcf.add_sub_element("worldbody", "light", attrib={"pos": "0 0 1.5","dir": "0 0 -1","directional":"true",})
@@ -27,8 +29,7 @@ mjcf.add_sub_element("mujoco", "custom")
 mjcf.add_sub_element("custom", "text", attrib={"name": "custom", "data": "aabb"})
 mjcf.add_sub_element("custom", "text", attrib={"name": "custom2", "data": "bbcc"})
 
-mjcf.add_sub_element("mujoco", "include", attrib={"file": load_key_path})
-mjcf.save(temp_k_path)
+mjcf.save(temp_path)
 
 anchor = ["FL_foot_joint", "FR_foot_joint", "RR_foot_joint", "RL_foot_joint"]
 anchor_ref = [ref+"_ref" for ref in anchor]
@@ -36,9 +37,9 @@ anchor_ref = [ref+"_ref" for ref in anchor]
 cfg = IK_and_savekey.mink_cfg("base_link",anchor,anchor_ref)
 cfg.orientation_cost = 0.6
 
-plk = IK_and_savekey.PlanningKeyframe(temp_k_path,cfg,save_key_path=go2w_vtm.GO2W_MJCF_DIR,save_key_name="terrain_k") # mink
-hz = 100
-plk.run_interpolation_and_store(go2w_vtm.GO2W_MJCF_DIR + "/terrain_k.npz",(1.0,0.0,0.0),hz)
+plk = IK_and_savekey.PlanningKeyframe(temp_path,cfg,save_key_path=go2w_vtm.GO2W_MJCF_DIR,save_key_name="terrain_k") # mink
+hz = 30
+plk.run_interpolation_and_store(go2w_vtm.GO2W_MJCF_DIR + "/" + terrain_name + "_k.npz",(1.5,0.0,0.0),hz)
 with mujoco.viewer.launch_passive(plk.model, plk.data,key_callback=plk.key_callback,
                                   show_left_ui=False,show_right_ui=False) as viewer:
     plk.draw_terrain_key_pos(viewer)
@@ -54,5 +55,5 @@ with mujoco.viewer.launch_passive(plk.model, plk.data,key_callback=plk.key_callb
         time.sleep(max(0,1.0/hz - (end_time - start_time)))
         viewer.sync()
 
-plk.save_keyframe(save_path = go2w_vtm.GO2W_MJCF_DIR + "/terrain_k_interpolated.xml")
+# plk.save_keyframe(save_path = go2w_vtm.GO2W_MJCF_DIR + "/terrain_k_interpolated.xml")
         

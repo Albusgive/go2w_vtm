@@ -11,6 +11,7 @@ from isaaclab.terrains.sub_terrain_cfg import SubTerrainBaseCfg
 from go2w_vtm.terrains import mimic_gym_terrain
 from go2w_vtm.terrains import terrain_2_mjcf
 from collections.abc import Callable
+from typing import List, Tuple
 import trimesh
 import numpy as np
 import os
@@ -31,8 +32,8 @@ class SaveTerrainCfg(SubTerrainBaseCfg):
     terrain_x: float = MISSING  
     robot_origin_x: float = 1.5
     
-    def make_check_points(self, difficulty: float):
-        return None
+    def make_check_points(self, difficulty: float)->Tuple[List[np.ndarray], List[str]]:
+        return None, None
     
 
 @configclass
@@ -46,6 +47,8 @@ class MimicFixBoxTerrainCfg(SaveTerrainCfg):
     high_platform_half_height: list[float] = MISSING  
     
     robot_origin_x: float = 1.5
+    
+    terrain_x: float = 0.0
     
     terrain_name: str = "trench_box_terrain"
 
@@ -80,7 +83,7 @@ class BoxTrenchTerrainCfg(SaveTerrainCfg):
     ''' 自动计算中间key_pos 然后k帧数据保存key_name和相对于key的pos 
     返回的为 terrain_key_pos_list 为 terrain 坐标系,即原点在右下
     '''
-    def make_check_points(self, difficulty: float) ->list[np.ndarray]:
+    def make_check_points(self, difficulty: float) ->Tuple[List[np.ndarray], List[str]]:
         from . import make_terrain_check_point
         return make_terrain_check_point.makeBoxTrenchTerrainCheckPoint(
             difficulty=difficulty,
@@ -104,7 +107,7 @@ class BoxHighPlatformTerrainCfg(SaveTerrainCfg):
     
     ''' 自动计算中间key_pos 然后k帧数据保存key_name和相对于key的pos 
     返回的为 terrain_key_pos_list 为 terrain 坐标系,即原点在右下'''
-    def make_check_points(self, difficulty: float) ->list[np.ndarray]:
+    def make_check_points(self, difficulty: float) ->Tuple[List[np.ndarray], List[str]]:
         from . import make_terrain_check_point
         return make_terrain_check_point.makeBoxHighPlatformTerrainCheckPoint(
             difficulty=difficulty,
@@ -131,7 +134,7 @@ class BoxRockFissureTerrainCfg(SaveTerrainCfg):
     
     ''' 自动计算中间key_pos 然后k帧数据保存key_name和相对于key的pos 
     返回的为 terrain_key_pos_list 为 terrain 坐标系,即原点在右下'''
-    def make_check_points(self, difficulty: float) ->list[np.ndarray]:
+    def make_check_points(self, difficulty: float) ->Tuple[List[np.ndarray], List[str]]:
         from . import make_terrain_check_point
         return make_terrain_check_point.makeBoxRockFissureTerrainCheckPoint(
             difficulty=difficulty,
@@ -159,7 +162,7 @@ class BoxFloatBoxTerrainCfg(SaveTerrainCfg):
     
     ''' 自动计算中间key_pos 然后k帧数据保存key_name和相对于key的pos 
     返回的为 terrain_key_pos_list 为 terrain 坐标系,即原点在右下'''
-    def make_check_points(self, difficulty: float) ->list[np.ndarray]:
+    def make_check_points(self, difficulty: float) ->Tuple[List[np.ndarray], List[str]]:
         from . import make_terrain_check_point
         return make_terrain_check_point.makeBoxFloatBoxTerrainCheckPoint(
             difficulty=difficulty,

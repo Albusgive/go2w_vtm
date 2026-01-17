@@ -1,9 +1,10 @@
 #对于不同地形计算不同的checkpoint
+from typing import List, Tuple
 import numpy as np
 
 def makeBoxTrenchTerrainCheckPoint(
     difficulty: float,size: tuple[float, float],terrain_x: float,robot_origin_x: float,
-    trench_width: tuple[float, float])->list[np.ndarray]:
+    trench_width: tuple[float, float])->Tuple[List[np.ndarray], List[str]]:
     
     terrain_x_min= robot_origin_x + terrain_x
     trench_width = trench_width[0] + (trench_width[1] - trench_width[0]) * difficulty

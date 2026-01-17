@@ -272,3 +272,12 @@ def randomize_terrain_motion(
     max_len = command.terrain_motion_table.shape[1]
     rand_idx = torch.randint(0, max_len, (len(env_ids),), device=command.device)
     command.motion_ids[env_ids] = command.terrain_motion_table[terrain_ids, rand_idx]
+    
+    
+from go2w_vtm.terrains import ConfirmTerrainImporter
+def evenly_distributed_env_origins(
+    env: ManagerBasedRLEnv, env_ids: torch.Tensor
+) -> torch.Tensor:
+    if isinstance(env.scene.terrain, ConfirmTerrainImporter):
+        terrain: ConfirmTerrainImporter = env.scene.terrain
+        terrain.evenly_distributed_env_origins()

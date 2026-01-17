@@ -66,6 +66,7 @@ class MySceneCfg(InteractiveSceneCfg):
             texture_scale=(0.25, 0.25),
         ),
         debug_vis=True,
+        checkpoint_debug_vis=True,
     )
     # robots
     robot: ArticulationCfg = MISSING
@@ -259,6 +260,11 @@ class EventCfg:
     #     mode="interval",
     #     interval_range_s=(1.0, 3.0),
     #     params={"velocity_range": {"x": (-0.01, 0.01), "y": (-0.01, 0.01)}},
+    # )
+    
+    # evenly_distributed_env_origins = EventTerm(
+    #     func=mdp.evenly_distributed_env_origins,
+    #     mode="reset",
     # )
 
 

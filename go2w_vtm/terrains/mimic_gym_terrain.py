@@ -221,7 +221,7 @@ def fix_box_terrain(difficulty: float, cfg: mimic_gym_terrain_cfg.MimicFixBoxTer
         box_mesh = create_mujoco_box_mesh(box_size, box_center_pos, origin)
         meshes_list.append(box_mesh)
     
-    save_terrain_as_mjcf_with_stl(cfg=cfg, meshes_list=meshes_list, origin=origin, difficulty=difficulty)
+    # save_terrain_as_mjcf_with_stl(cfg=cfg, meshes_list=meshes_list, origin=origin, difficulty=difficulty)
 
     return meshes_list, origin
 
@@ -302,7 +302,6 @@ def box_platform_terrain(difficulty: float, cfg: mimic_gym_terrain_cfg.BoxHighPl
     """
     生成两块box的地面和高台
     """
-    #计算沟壑宽度 platform_width range*difficulty
     terrain_x_min = cfg.terrain_x+cfg.robot_origin_x
     if cfg.size[0] < terrain_x_min:
         raise ValueError("size[0] must be greater than terrain_x + robot_origin_x.")
@@ -323,7 +322,7 @@ def box_platform_terrain(difficulty: float, cfg: mimic_gym_terrain_cfg.BoxHighPl
     
     # 高台
     platform_height = cfg.platform_height[0] + (cfg.platform_height[1] - cfg.platform_height[0]) * difficulty
-    box2_extents = [cfg.size[0]-terrain_x_min, cfg.size[1], platform_height]
+    box2_extents = [cfg.platform_width, cfg.size[1], platform_height]
     box2_center_pos = [box2_extents[0]/2+terrain_x_min, cfg.size[1]/2, box2_extents[2]/2]
     box2 = trimesh.creation.box(extents=box2_extents)
     box2.apply_translation(box2_center_pos)

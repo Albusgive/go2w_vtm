@@ -250,9 +250,10 @@
   <keyframe>
     <key name="init" time="0.0" qpos="0 0.8 -1.8 0 0 0.8 -1.8 0 0 0.8 -1.8 0 0 0.8 -1.8 0" mpos="0 0 0.3 0.2 0.15 0.03 0.18 -0.15 0.03 -0.18 0.15 0.03 -0.2 -0.15 0.03" />
   </keyframe>
-  <include file="/home/albusgive2/go2w_vtm/go2w_vtm/Robot/go2w_description/mjcf/test_box_platform_terrain.xml" />
+  <include file="/home/albusgive2/go2w_vtm/go2w_vtm/Robot/go2w_description/mjcf/test_trench_box_terrain.xml" />
   <custom>
     <text name="custom" data="aabb" />
     <text name="custom2" data="bbcc" />
   </custom>
+  <include file="/home/albusgive2/go2w_vtm/go2w_vtm/Robot/go2w_description/mjcf/terrain_k.xml" />
 </mujoco>
