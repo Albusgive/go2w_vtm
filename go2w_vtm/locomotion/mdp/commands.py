@@ -1284,3 +1284,47 @@ class MotionCommandCfg(CommandTermCfg):
     # Set the scale of the visualization markers to (0.5, 0.5, 0.5)
     goal_vel_visualizer_cfg.markers["arrow"].scale = (0.5, 0.5, 0.5)
     current_vel_visualizer_cfg.markers["arrow"].scale = (0.5, 0.5, 0.5)
+    
+
+
+""" IK """
+class IKCommand(CommandTerm):
+    cfg: IKCommandCfg
+
+    def __init__(self, cfg: IKCommandCfg, env: ManagerBasedRLEnv):
+        super().__init__(cfg, env)
+
+        self.robot: Articulation = env.scene[cfg.asset_name]
+        self.cnt = 1.5
+
+
+    def _update_command(self):
+        root_states = self.robot.data.root_state_w.clone()
+        root_states[:, 2] = math.sin(self.cnt)
+        root_states[:, 7:] = 0
+        self.robot.write_root_state_to_sim(root_states)
+        self.cnt += 0.01
+    
+    def _resample_command(self, env_ids: Sequence[int]):
+        pass
+    
+    def _update_metrics(self):
+        pass
+    
+    @property
+    def command(self) -> torch.Tensor:
+        return self.robot.data.default_root_state
+
+
+@configclass
+class IKCommandCfg(CommandTermCfg):
+    """Configuration for the motion command."""
+
+    class_type: type = IKCommand
+
+    asset_name: str = MISSING
+    
+    ''' IK的关节和body名称 '''
+    # joint_names: list[str] = MISSING
+    # body_names: list[str] = MISSING
+    

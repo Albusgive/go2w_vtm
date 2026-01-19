@@ -225,7 +225,7 @@ CONFIRM_TERRAIN_CFG2 = ConfirmTerrainGeneratorCfg(
     vertical_scale=0.005,
     slope_threshold=0.75,
     use_cache=False,
-    curriculum=True, # 要开
+    curriculum=True, # 要开才能获取自定义地形和地形位置(有规律的)
     # color_scheme="random",
     sub_terrains={
         "mimic_trench": terrain_gen.BoxTrenchTerrainCfg(

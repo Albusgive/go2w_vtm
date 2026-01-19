@@ -4,11 +4,11 @@ from isaaclab.utils import configclass
 
 import go2w_vtm.locomotion.mdp as mdp
 
-from ..mimic_env_cfg import ActionsCfg, MimicEnvCfg
+from ..mimic_env_cfg import ActionsCfg, MimicEnvCfg, MySceneCfg
 from ..mimic_env_cfg import RewardsCfg
 
 import go2w_vtm
-from go2w_vtm.Robot.go2w import UNITREE_GO2W_CFG,UNITREE_GO2W_NO_MOTOR_LIMIT_CFG
+from go2w_vtm.Robot.go2w import UNITREE_GO2W_CFG,UNITREE_GO2W_NO_MOTOR_LIMIT_CFG,UNITREE_GO2W_IK_CFG
 from go2w_vtm.terrains.config.rough import MIMIC_GYM_TERRAIN_CFG,CONFIRM_TERRAIN_CFG,CONFIRM_TERRAIN_CFG2
 
 from isaaclab.utils.noise import UniformNoiseCfg
@@ -118,6 +118,7 @@ class UnitreeGo2WMimicEnvCfg(MimicEnvCfg):
                                                     "mimic_high_platform":["climb_k"]
                                                    }
         self.commands.motion.debug_vis = False
+        self.commands.ik_cmd = None
         # ------------------------------Observations------------------------------
         self.observations.policy.joint_pos.func = mdp.joint_pos_rel
         self.observations.policy.joint_pos.params["asset_cfg"] = SceneEntityCfg(
@@ -160,7 +161,7 @@ class UnitreeGo2WMimicEnvCfg(MimicEnvCfg):
         # If the weight of rewards is 0, set rewards to None
         if self.__class__.__name__ == "UnitreeGo2WMimicEnvCfg":
             self.disable_zero_weight_rewards()
-
+    
         
 @configclass
 class TestUnitreeGo2WMimicEnvCfg(UnitreeGo2WMimicEnvCfg):
@@ -168,9 +169,9 @@ class TestUnitreeGo2WMimicEnvCfg(UnitreeGo2WMimicEnvCfg):
     def __post_init__(self):
         # post init of parent
         super().__post_init__()
-
         # ------------------------------Sence------------------------------
         self.scene.robot = UNITREE_GO2W_NO_MOTOR_LIMIT_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+        self.scene.ik_robot = UNITREE_GO2W_IK_CFG.replace(prim_path="{ENV_REGEX_NS}/IKRobot")
         # ------------------------------Terrain------------------------------
         self.scene.terrain.terrain_generator = CONFIRM_TERRAIN_CFG2
         # ------------------------------commands------------------------------
@@ -193,5 +194,9 @@ class TestUnitreeGo2WMimicEnvCfg(UnitreeGo2WMimicEnvCfg):
         #                                             "mimic_trench":["leap_k"],
         #                                             "mimic_high_platform":["climb_k"]
         #                                            }
+        
+        # self.commands.ik_cmd = None
+        # ------------------------------terminations------------------------------
+
 
 

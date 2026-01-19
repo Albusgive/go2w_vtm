@@ -23,13 +23,14 @@
 
   </worldbody>
   <include file="go2w_mocap2free.xml" />
-  <include file="trench_box_terrain.xml" />
+  <!-- <include file="trench_box_terrain.xml" /> -->
   <!-- <include file="high_platform.xml" /> -->
 
   <!-- motion -->
-   <include file="go2w_jump.xml" />
+   <!-- <include file="go2w_jump.xml" /> -->
   <!-- <include file="go2w_leap1.xml" /> -->
   <!-- <include file="human_k.xml" /> -->
    <!-- <include file="compute_k.xml" /> -->
-   <!-- <include file="compute_k2.xml" /> -->
+   <include file="compute_k2.xml" />
+    <!--  !!!!!!! compute_k->leap_k  compute_k2->climb_k -->
 </mujoco>
