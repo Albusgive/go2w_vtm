@@ -92,6 +92,12 @@ class PlanningKeyframe:
         # 数据保存
         self.keyframe_data = KeyFrame.KeyFrame()
         self.keyframe_data.setSaveFields(qpos=True, mocap_pos=True,mocap_quat=True)
+        
+        # mocap设定
+        self.root_mocap_name = None
+        self.target_mocap_names = None
+        self.root_mocap_id = None
+        self.target_mocap_ids = None
 
         # 总帧数
         self.nkey = 0
@@ -103,8 +109,11 @@ class PlanningKeyframe:
         self.terrain = DecodeTerrain(self.model)
         self.save_key_path = save_key_path
         self.save_key_name = save_key_name
-        self.save_mjcf_key_path = os.path.join(self.save_key_path,self.save_key_name+".xml")
-        self.save_npz_key_path = os.path.join(self.save_key_path,self.save_key_name+".npz")
+        self.save_mjcf_key_path = None
+        self.save_npz_key_path = None
+        if save_key_path is not None and save_key_name is not None:
+            self.save_mjcf_key_path = os.path.join(self.save_key_path,self.save_key_name+".xml")
+            self.save_npz_key_path = os.path.join(self.save_key_path,self.save_key_name+".npz")
         if self.terrain.n_points > 0:
             self.key_id = 0
             self.key_id_last = 0
@@ -129,6 +138,12 @@ class PlanningKeyframe:
         self.grid_rgba = [0.0, 0.0, 0.0, 0.5]
         self.close_grid = False
         self.close_grid_update = False
+    
+    def set_root_targets(self,root_mocap_name:str,target_mocap_names:list[str]):
+        self.root_mocap_name = root_mocap_name
+        self.target_mocap_names = target_mocap_names
+        self.root_mocap_id = self.model.body(self.root_mocap_name).mocapid[0]
+        self.target_mocap_ids = [self.model.body(name).mocapid[0] for name in self.target_mocap_names]
     
     def key_callback(self,key:int):
         if key == glfw.KEY_LEFT_ALT:
@@ -265,79 +280,155 @@ class PlanningKeyframe:
                 
                 
     def save_relative_npz(self, file_path: str):
-            """
-            保存所有 mocap body 的相对位姿
-            数据形状: [nkey, nmocap, 3] 和 [nkey, nmocap, 4]
-            """
-            if not self.keyframe_data.keys_in_memory:
-                print("No keys to save.")
-                return
+        if not self.keyframe_data.keys_in_memory:
+            print("No keys to save.")
+            return
 
-            names = []
-            all_pos_offsets = []
-            all_quats = []
+        root_pos_offsets = []
+        root_quats = []
+        target_rel_pos = []
+        target_rel_quats = []
+        names = []
 
-            for i, key in enumerate(self.keyframe_data.keys_in_memory):
-                names.append(key.name)
-                
-                # 1. 获取该帧所有的 mocap_pos (nmocap, 3)
-                # 2. 获取对应的地形点 (3,) -> 广播减法
-                terrain_pos = self.terrain.terrain_key_pos[i]
-                relative_pos = key.mocap_pos - terrain_pos # (nmocap, 3) - (3,)
-                
-                all_pos_offsets.append(relative_pos)
-                all_quats.append(key.mocap_quat)
+        for i, key in enumerate(self.keyframe_data.keys_in_memory):
+            names.append(key.name)
+            
+            # --- 1. 处理 Root (相对于地形) ---
+            r_pos = key.mocap_pos[self.root_mocap_id]
+            r_quat = key.mocap_quat[self.root_mocap_id]
+            terrain_pos = self.terrain.terrain_key_pos[i]
+            
+            root_pos_offsets.append(r_pos - terrain_pos)
+            root_quats.append(r_quat)
 
-            # 转换为 numpy 大数组
-            np.savez_compressed(
-                file_path,
-                names=np.array(names),
-                mocap_pos_offsets=np.array(all_pos_offsets), # [nkey, nmocap, 3]
-                mocap_quats=np.array(all_quats),             # [nkey, nmocap, 4]
-                # 也可以顺便存下 qpos 以防需要完全恢复状态
-                all_qpos=np.array([k.qpos for k in self.keyframe_data.keys_in_memory]) 
-            )
-            print(f"✅ Full relative mocap data saved to {file_path}")
+            # --- 2. 处理 Targets (相对于 Root) ---
+            t_pos_list = []
+            t_quat_list = []
+            for t_id in self.target_mocap_ids:
+                rel_p, rel_q = self._get_relative_pose(r_pos, r_quat, key.mocap_pos[t_id], key.mocap_quat[t_id])
+                t_pos_list.append(rel_p)
+                t_quat_list.append(rel_q)
+            
+            target_rel_pos.append(t_pos_list)
+            target_rel_quats.append(t_quat_list)
+
+        # 保存时增加 root_name 和 target_names
+        np.savez_compressed(
+            file_path,
+            names=np.array(names),
+            root_name=np.array(self.root_mocap_name), # 保存 Root 名称
+            target_names=np.array(self.target_mocap_names), # 按顺序保存 Targets 名称
+            root_pos_offsets=np.array(root_pos_offsets),
+            root_quats=np.array(root_quats),
+            target_rel_pos=np.array(target_rel_pos),
+            target_rel_quats=np.array(target_rel_quats),
+            all_qpos=np.array([k.qpos for k in self.keyframe_data.keys_in_memory if k.qpos is not None])
+        )
+        print(f"✅ Saved hierarchical data with names to {file_path}")
+        
+    
+    def save_relative_npz(self, file_path: str):
+        if not self.keyframe_data.keys_in_memory:
+            print("No keys to save.")
+            return
+
+        root_pos_offsets = []
+        root_quats = []
+        target_rel_pos = []
+        target_rel_quats = []
+        names = []
+
+        for i, key in enumerate(self.keyframe_data.keys_in_memory):
+            names.append(key.name)
+            
+            # --- 1. 处理 Root (相对于地形) ---
+            r_pos = key.mocap_pos[self.root_mocap_id]
+            r_quat = key.mocap_quat[self.root_mocap_id]
+            terrain_pos = self.terrain.terrain_key_pos[i]
+            
+            root_pos_offsets.append(r_pos - terrain_pos)
+            root_quats.append(r_quat)
+
+            # --- 2. 处理 Targets (相对于 Root) ---
+            t_pos_list = []
+            t_quat_list = []
+            for t_id in self.target_mocap_ids:
+                rel_p, rel_q = self._get_relative_pose(r_pos, r_quat, key.mocap_pos[t_id], key.mocap_quat[t_id])
+                t_pos_list.append(rel_p)
+                t_quat_list.append(rel_q)
+            
+            target_rel_pos.append(t_pos_list)
+            target_rel_quats.append(t_quat_list)
+
+        # 保存时增加 root_name 和 target_names
+        np.savez_compressed(
+            file_path,
+            names=np.array(names),
+            root_name=np.array(self.root_mocap_name), # 保存 Root 名称
+            target_names=np.array(self.target_mocap_names), # 按顺序保存 Targets 名称
+            root_pos_offsets=np.array(root_pos_offsets),
+            root_quats=np.array(root_quats),
+            target_rel_pos=np.array(target_rel_pos),
+            target_rel_quats=np.array(target_rel_quats),
+            all_qpos=np.array([k.qpos for k in self.keyframe_data.keys_in_memory if k.qpos is not None])
+        )
+        print(f"✅ Saved hierarchical data with names to {file_path}")
 
     def load_relative_npz(self, file_path: str):
-        """
-        加载并根据当前地形点还原所有 mocap body 的位置
-        """
         if not Path(file_path).exists():
             print(f"File {file_path} not found.")
             return
+        
         with np.load(file_path, allow_pickle=True) as data:
-            names = data['names']
-            offsets = data['mocap_pos_offsets'] # [n_saved, nmocap, 3]
-            quats = data['mocap_quats']         # [n_saved, nmocap, 4]
-            all_qpos = data['all_qpos'] if 'all_qpos' in data else None
+            # 读取名称并转换回字符串列表
+            file_root_name = str(data['root_name'])
+            file_target_names = [str(n) for n in data['target_names']]
+            
+            r_offsets = data['root_pos_offsets']
+            r_quats = data['root_quats']
+            t_rel_pos = data['target_rel_pos']
+            t_rel_quats = data['target_rel_quats']
+            all_qpos = data.get('all_qpos')
+            names = data.get('names', [])
+
+        # --- 核心逻辑：重新根据保存的名称寻找当前模型的 ID ---
+        try:
+            load_root_id = self.model.body(file_root_name).mocapid[0]
+            load_target_ids = [self.model.body(name).mocapid[0] for name in file_target_names]
+        except Exception as e:
+            print(f"❌ Load failed: Model bodies do not match names in NPZ. {e}")
+            return
 
         self.keyframe_data.clear()
-        # 注意：如果加载的文件点数和当前地形点数不一致，以较小的为准
-        load_count = min(len(names), self.nkey)
-        self.key_edited_status = [False] * self.nkey
+        load_count = min(len(r_offsets), self.nkey)
 
         for i in range(load_count):
             key = KeyFrame.KeyData()
-            key.name = str(names[i])
-            key.time = float(i)
+            key.name = str(names[i]) if i < len(names) else f"key_{i}"
+            key.mocap_pos = np.zeros((self.model.nmocap, 3))
+            key.mocap_quat = np.tile([1, 0, 0, 0], (self.model.nmocap, 1)).astype(np.float64)
+
+            # 1. 还原 Root 世界位姿
+            world_root_pos = self.terrain.terrain_key_pos[i] + r_offsets[i]
+            world_root_quat = r_quats[i]
+            key.mocap_pos[load_root_id] = world_root_pos
+            key.mocap_quat[load_root_id] = world_root_quat
+
+            # 2. 还原每个 Target 的世界位姿 (对应顺序)
+            for j, t_id in enumerate(load_target_ids):
+                w_p, w_q = self._get_world_pose(world_root_pos, world_root_quat, t_rel_pos[i, j], t_rel_quats[i, j])
+                key.mocap_pos[t_id] = w_p
+                key.mocap_quat[t_id] = w_q
             
-            # 还原绝对坐标：当前地形点 + 偏移量
-            # terrain_pos (3,) + offset (nmocap, 3) -> (nmocap, 3)
-            key.mocap_pos = self.terrain.terrain_key_pos[i] + offsets[i]
-            key.mocap_quat = quats[i].copy()
-            
-            if all_qpos is not None:
+            if all_qpos is not None and len(all_qpos) > i:
                 key.qpos = all_qpos[i].copy()
-            else:
-                key.qpos = self.data.qpos.copy() # 退而求其次
             
             self.keyframe_data.keys_in_memory.append(key)
             self.key_edited_status[i] = True
 
         self.key_id = 0
         self.change_key = True
-        print(f"✅ Restored {load_count} keys with full mocap hierarchy.")
+        print(f"✅ Successfully restored {load_count} frames using hierarchical names.")
         
         
     def sync_from_model_keys(self):
@@ -375,66 +466,98 @@ class PlanningKeyframe:
         print(f"✅ Successfully synced {sync_count} keys from MJCF.")
         self.change_key = True 
         
-    
-    def run_interpolation_and_store(self, npz_path: str, cmd_vel=(0.5, 0.0, 0.0), fps: int = 50):
+    ''' 插帧 '''
+    def load_interpolator_config(self, npz_path: str):
         """
-        利用并行插值器计算当前环境的完整轨迹，并存入主 keyframe_data。
-        cmd_vel: 支持 (3,) 的 list/tuple 或 (1, 3) 的 ndarray/tensor
+        函数 1: 加载配置。
+        从 NPZ 中读取 root 和 targets 的名称，并初始化插值器。
         """
-        # 1. 准备并行输入 (Batch Size = 1)
-        # terrain_key_pos: (Keys, 3) -> (1, Keys, 3)
+        if not os.path.exists(npz_path):
+            print(f"❌ File not found: {npz_path}")
+            return
+        
+        # 加载数据以获取名称映射
+        data = np.load(npz_path, allow_pickle=True)
+        self.root_mocap_name = str(data['root_name'])
+        self.target_mocap_names = [str(n) for n in data['target_names']]
+        
+        # 重新解析当前模型的 ID (防止模型 ID 变动)
+        self.root_mocap_id = self.model.body(self.root_mocap_name).mocapid[0]
+        self.target_mocap_ids = [self.model.body(name).mocapid[0] for name in self.target_mocap_names]
+        
+        # 初始化插值器
+        self.interpolator = MocapInterpolator(npz_path, device="cuda")
+        print(f"✅ Interpolator loaded with root: {self.root_mocap_name}")
+
+    def compute_and_store_interpolated_frames(self, cmd_vel=(0.5, 0.0, 0.0), fps: int = 50):
+        """
+        函数 2: 计算全部帧并储存。
+        将结果还原为世界坐标系下的 mocap 数据，存入 keyframe_data。
+        """
+        if not hasattr(self, 'interpolator'):
+            print("❌ Please call load_interpolator_config first!")
+            return
+
+        # 1. 准备输入 (batch_size = 1)
         terrain_tensor = torch.from_numpy(self.terrain.terrain_key_pos).float().to("cuda").unsqueeze(0)
-        
-        # cmd_vel 处理: 确保转换成 (1, 3) 的 tensor
-        if not isinstance(cmd_vel, torch.Tensor):
-            cmd_tensor = torch.tensor(cmd_vel, device="cuda").float()
-        else:
-            cmd_tensor = cmd_vel.to("cuda").float()
-        
-        if cmd_tensor.ndim == 1:
-            cmd_tensor = cmd_tensor.unsqueeze(0) # (3,) -> (1, 3)
+        cmd_tensor = torch.tensor(cmd_vel, device="cuda").float().unsqueeze(0)
 
-        # 2. 调用并行插值器
-        interpolator = MocapInterpolator(npz_path, device="cuda")
+        # 2. 并行计算全量帧
+        # result 包含: root_pos, root_quat, target_rel_pos, target_rel_quat
+        result = self.interpolator.interpolate(terrain_tensor, cmd_tensor, fps=fps)
         
-        # 得到并行计算结果 trajs: (1, Total_Frames, Num_Mocap, 7)
-        trajs = interpolator.interpolate(terrain_tensor, cmd_vel=cmd_tensor, fps=fps)
-        
-        # 3. 数据回流：从 Tensor 取出并填充到 keyframe_data
-        traj_np = trajs[0].detach().cpu().numpy()
-        num_frames = traj_np.shape[0]
-
+        # 3. 数据回流：清空旧数据，填充新帧
         self.keyframe_data.clear()
-        print(f"🔄 Interpolating {num_frames} frames into keyframe_data at {fps} FPS...")
+        num_frames = result["root_pos"].shape[1]
+        
+        # 提取 Tensor 到 CPU (Index 0)
+        r_pos_seq = result["root_pos"][0].cpu().numpy()
+        r_quat_seq = result["root_quat"][0].cpu().numpy()
+        t_rel_pos_seq = result["target_rel_pos"][0].cpu().numpy()
+        t_rel_quat_seq = result["target_rel_quat"][0].cpu().numpy()
 
-        # 预先获取当前的 qpos 作为初始参考
-        initial_qpos = self.data.qpos.copy()
+        print(f"🔄 Storing {num_frames} interpolated frames...")
 
-        for i in range(num_frames):
+        for f in range(num_frames):
             kd = KeyFrame.KeyData()
-            # 这里的 name 建议保留一些原始 key 的信息，或者简单编号
-            kd.name = f"f_{i:04d}" 
-            kd.time = i / fps
+            kd.name = f"interp_{f:04d}"
+            kd.time = f / fps
             
-            # 赋值 Mocap 数据 (Num_Mocap, 3) 和 (Num_Mocap, 4)
-            kd.mocap_pos = traj_np[i, :, :3].copy()
-            kd.mocap_quat = traj_np[i, :, 3:].copy()
+            # 初始化本帧全量 mocap 数据
+            m_pos = np.zeros((self.model.nmocap, 3))
+            m_quat = np.tile([1, 0, 0, 0], (self.model.nmocap, 1)).astype(np.float64)
+
+            # --- A. 还原 Root ---
+            curr_r_pos = r_pos_seq[f]
+            curr_r_quat = r_quat_seq[f]
+            m_pos[self.root_mocap_id] = curr_r_pos
+            m_quat[self.root_mocap_id] = curr_r_quat
+
+            # --- B. 还原 Targets (从 Root 坐标系转回世界坐标系) ---
+            for i, t_id in enumerate(self.target_mocap_ids):
+                # 利用 _get_world_pose 将相对位姿转为世界位姿
+                w_p, w_q = self._get_world_pose(
+                    curr_r_pos, 
+                    curr_r_quat, 
+                    t_rel_pos_seq[f, i], 
+                    t_rel_quat_seq[f, i]
+                )
+                m_pos[t_id] = w_p
+                m_quat[t_id] = w_q
             
-            # 重要：qpos 处理
-            # 只有第一帧携带当前姿态，后续由 IK 连续跟踪
-            # 如果每一帧都 copy 当前 data.qpos，在非实时回放时会导致 IK 丢失目标
-            kd.qpos = initial_qpos.copy() if i == 0 else None 
+            kd.mocap_pos = m_pos
+            kd.mocap_quat = m_quat
+            # 只有第一帧携带 qpos，后续由预览时的 IK 实时解算
+            kd.qpos = self.data.qpos.copy() if f == 0 else None
             
             self.keyframe_data.keys_in_memory.append(kd)
 
-        # 4. 更新 PlanningKeyframe 状态
+        # 更新 PlanningKeyframe 状态以便 UI 预览
         self.nkey = len(self.keyframe_data.keys_in_memory)
+        self.key_edited_status = [True] * self.nkey
         self.key_id = 0
-        # 标记所有生成的帧为“已录入”状态，允许自由切换预览
-        self.key_edited_status = [True] * self.nkey 
         self.change_key = True
-        
-        print(f"✅ Generated {self.nkey} frames. Ready for playback.")
+        print(f"✅ All frames stored. Ready for playback.")
 
 
     ''' 渲染 '''
@@ -455,7 +578,7 @@ class PlanningKeyframe:
                            resolution=1.0, 
                            scale=1.0, 
                            rgba=[0.5, 0.5, 0.5, 0.1], 
-                           line_thickness=0.01):
+                           line_thickness=0.01,hide=False):
         """
         在场景 AABB 范围内绘制 3D 网格。
         resolution: 网格间距 (米)
@@ -552,6 +675,10 @@ class PlanningKeyframe:
                 add_line(np.array([x, y, g_min[2]]), np.array([x, y, g_max[2]]))
         # 5. 记录总数
         self.grid_geom_count = viewer.user_scn.ngeom - initial_ngeom
+        if hide:
+            rgba = [self.grid_rgba[0],self.grid_rgba[1],self.grid_rgba[2],0.0]
+            self.update_grid_color(rgba)
+            self.close_grid = True
 
     def update_grid_color(self, new_rgba):
         """
@@ -564,3 +691,31 @@ class PlanningKeyframe:
             idx = self.grid_geom_start_idx + i
             if idx < self.viewer.user_scn.maxgeom:
                 self.viewer.user_scn.geoms[idx].rgba[:] = new_rgba
+
+    '''  math  '''          
+    def _get_relative_pose(self, root_pos, root_quat, target_pos, target_quat):
+        """计算 target 在 root 坐标系下的位姿"""
+        # 1. 计算相对位置: R_root^T * (p_target - p_root)
+        rel_pos = np.zeros(3)
+        inv_root_quat = np.zeros(4)
+        mujoco.mju_negQuat(inv_root_quat, root_quat)
+        
+        diff = target_pos - root_pos
+        mujoco.mju_rotVecQuat(rel_pos, diff, inv_root_quat)
+        
+        # 2. 计算相对旋转: q_inv_root * q_target
+        rel_quat = np.zeros(4)
+        mujoco.mju_mulQuat(rel_quat, inv_root_quat, target_quat)
+        return rel_pos, rel_quat
+
+    def _get_world_pose(self, root_pos, root_quat, rel_pos, rel_quat):
+        """将 local 坐标还原回世界坐标"""
+        # 1. 还原位置: p_root + R_root * p_rel
+        world_pos = np.zeros(3)
+        mujoco.mju_rotVecQuat(world_pos, rel_pos, root_quat)
+        world_pos += root_pos
+        
+        # 2. 还原旋转: q_root * q_rel
+        world_quat = np.zeros(4)
+        mujoco.mju_mulQuat(world_quat, root_quat, rel_quat)
+        return world_pos, world_quat

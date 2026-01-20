@@ -4,6 +4,7 @@ from isaaclab.actuators import DCMotorCfg
 from isaaclab.assets.articulation import ArticulationCfg
 from isaaclab.assets.asset_base_cfg import AssetBaseCfg
 from isaaclab.actuators import DelayedPDActuatorCfg, ImplicitActuatorCfg
+from isaaclab.sim import schemas
 import go2w_vtm
 
 UNITREE_GO2W_CFG = ArticulationCfg(
@@ -112,7 +113,7 @@ UNITREE_GO2W_NO_MOTOR_LIMIT_CFG = ArticulationCfg(
     },
 )
 
-from isaaclab.sim import schemas
+from isaaclab.sim.spawners import materials
 UNITREE_GO2W_IK_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
         usd_path=go2w_vtm.GO2W_USD_DIR,
@@ -131,7 +132,10 @@ UNITREE_GO2W_IK_CFG = ArticulationCfg(
             solver_velocity_iteration_count=0
         ),
         collision_props = schemas.CollisionPropertiesCfg(
-            collision_enabled = False
+            collision_enabled = False # 关闭所有碰撞
+        ),
+        visual_material=materials.PreviewSurfaceCfg(
+            diffuse_color = (0.1, 0.1, 0.9),
         )
     ),
     init_state=ArticulationCfg.InitialStateCfg(

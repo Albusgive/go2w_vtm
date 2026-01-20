@@ -162,7 +162,7 @@ class UnitreeGo2WMimicEnvCfg(MimicEnvCfg):
         if self.__class__.__name__ == "UnitreeGo2WMimicEnvCfg":
             self.disable_zero_weight_rewards()
     
-        
+    
 @configclass
 class TestUnitreeGo2WMimicEnvCfg(UnitreeGo2WMimicEnvCfg):
     
@@ -196,6 +196,19 @@ class TestUnitreeGo2WMimicEnvCfg(UnitreeGo2WMimicEnvCfg):
         #                                            }
         
         # self.commands.ik_cmd = None
+        self.commands.ik_cmd = mdp.IKCommandCfg(
+        asset_name="ik_robot",
+        resampling_time_range=(4, 4),
+        legs_config={
+            "FL_foot": ["FL_hip_joint", "FL_thigh_joint", "FL_calf_joint"],
+            "FR_foot": ["FR_hip_joint", "FR_thigh_joint", "FR_calf_joint"],
+            "RL_foot": ["RL_hip_joint", "RL_thigh_joint", "RL_calf_joint"],
+            "RR_foot": ["RR_hip_joint", "RR_thigh_joint", "RR_calf_joint"],
+        },
+        use_pose_mode=False,
+        debug_vis = True
+        )
+        
         # ------------------------------terminations------------------------------
 
 

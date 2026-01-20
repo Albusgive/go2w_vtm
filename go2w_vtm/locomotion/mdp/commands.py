@@ -694,7 +694,7 @@ class MultiMotionLoader:
         return self.num_motions
 
     
-    
+
 class MotionCommand(CommandTerm):
     cfg: MotionCommandCfg
 
@@ -1151,7 +1151,7 @@ class MotionCommand(CommandTerm):
 
     def _set_debug_vis_impl(self, debug_vis: bool):
         if debug_vis:
-            if not hasattr(self, "current_anchor_visualizer"):
+            if not hasattr(self, "current_body_visualizers"):
                 self.current_ref_body_visualizers = []
                 self.current_body_visualizers = []
                 self.goal_body_visualizers = []
@@ -1187,7 +1187,7 @@ class MotionCommand(CommandTerm):
             self.current_vel_visualizer.set_visibility(True)
 
         else:
-            if hasattr(self, "current_anchor_visualizer"):
+            if hasattr(self, "current_body_visualizers"):
                 for i in range(len(self.cfg.body_names)):
                     self.current_body_visualizers[i].set_visibility(False)
                     self.goal_body_visualizers[i].set_visibility(False)
@@ -1288,43 +1288,227 @@ class MotionCommandCfg(CommandTermCfg):
 
 
 """ IK """
+from isaaclab.controllers import DifferentialIKController, DifferentialIKControllerCfg
+from isaaclab.managers import SceneEntityCfg
+from typing import Literal
+from isaaclab.utils.math import subtract_frame_transforms,quat_apply_inverse
+
+
 class IKCommand(CommandTerm):
     cfg: IKCommandCfg
 
     def __init__(self, cfg: IKCommandCfg, env: ManagerBasedRLEnv):
+        # 1. 初始化基础属性
+        self.robot: Articulation = env.scene[cfg.asset_name]
+        self.body_names = list(cfg.legs_config.keys())
+        self.num_legs = len(self.body_names)
+        self.is_pose_mode = cfg.use_pose_mode
+        
+        # 2. 调用基类
         super().__init__(cfg, env)
 
-        self.robot: Articulation = env.scene[cfg.asset_name]
-        self.cnt = 1.5
+        # 3. 解析索引
+        self.cmd_type = "pose" if self.is_pose_mode else "position"
+        self.joint_ids_list = []
+        self.body_ids_list = []
+        self.jacobi_joint_ids_list = []
+        
+        for body_name in self.body_names:
+            joint_names = cfg.legs_config[body_name]
+            leg_entity_cfg = SceneEntityCfg(cfg.asset_name, joint_names=joint_names, body_names=[body_name])
+            leg_entity_cfg.resolve(env.scene)
+            self.joint_ids_list.append(leg_entity_cfg.joint_ids)
+            self.body_ids_list.append(leg_entity_cfg.body_ids[0])
+            
+            if self.robot.is_fixed_base:
+                self.jacobi_joint_ids_list.append(leg_entity_cfg.joint_ids)
+            else:
+                self.jacobi_joint_ids_list.append([idx + 6 for idx in leg_entity_cfg.joint_ids])
 
+        # 4. 控制器配置
+        total_ik_envs = self.num_envs * self.num_legs
+        diff_ik_cfg = DifferentialIKControllerCfg(command_type=self.cmd_type, use_relative_mode=False, ik_method="dls")
+        self.diff_ik_controller = DifferentialIKController(diff_ik_cfg, num_envs=total_ik_envs, device=self.device)
+        
+        # 5. 可视化维护的数据缓存
+        # 用于记录最近一次调用 compute_ik 时的输入输出，供 _debug_vis_callback 使用
+        self.last_root_pos_w = torch.zeros((self.num_envs, 3), device=self.device)
+        self.last_root_quat_w = torch.zeros((self.num_envs, 4), device=self.device)
+        self.last_root_quat_w[:, 0] = 1.0
+        self.last_ik_commands = torch.zeros((self.num_envs, self.num_legs, 7 if self.is_pose_mode else 3), device=self.device)
+        
+        
+        #-------- test 
+        self.test_root_pos = torch.zeros((self.num_envs, 3), device=self.device)
+        self.test_root_quat = torch.zeros((self.num_envs, 4), device=self.device)
+        self.test_root_quat[:, 0] = 1.0
+        
+        self.last_root_pos_w = self.test_root_pos
+        self.last_root_quat_w = self.test_root_quat
+        cmd_dim = 7 if self.is_pose_mode else 3
+        self.last_ik_commands = torch.zeros((self.num_envs, self.num_legs, cmd_dim), device=self.device)
+        if self.is_pose_mode: self.last_ik_commands[:, :, 3] = 1.0
+
+        for i, name in enumerate(self.body_names):
+            x_sign = 1.0 if "F" in name else -1.0
+            y_sign = 1.0 if "L" in name else -1.0
+            self.last_ik_commands[:, i, 0] = x_sign * 0.15 # 前后偏移
+            self.last_ik_commands[:, i, 1] = y_sign * 0.1  # 左右偏移
+            self.last_ik_commands[:, i, 2] = -0.3         # 初始高度
+
+        self.step_counter = 0
+
+    def compute_ik(self, root_pos_w: torch.Tensor, root_quat_w: torch.Tensor, ik_commands: torch.Tensor) -> torch.Tensor:
+        """
+        给定 Root 世界位姿和相对于 Base 的目标指令，计算并返回全身关节角度。
+        """
+        # 记录数据用于可视化
+        self.last_root_pos_w[:] = root_pos_w
+        self.last_root_quat_w[:] = root_quat_w
+        self.last_ik_commands[:] = ik_commands
+
+        all_ee_pos_b, all_ee_quat_b, all_jac_b, all_q = [], [], [], []
+        full_jac_w = self.robot.root_physx_view.get_jacobians()
+
+        for i in range(self.num_legs):
+            # 获取当前关节角度和末端世界位姿
+            q = self.robot.data.joint_pos[:, self.joint_ids_list[i]]
+            ee_pose_w = self.robot.data.body_pose_w[:, self.body_ids_list[i]]
+            
+            # 转换末端到 Base 系（计算当前误差）
+            ee_p_b, ee_q_b = subtract_frame_transforms(
+                root_pos_w, root_quat_w, ee_pose_w[:, 0:3], ee_pose_w[:, 3:7]
+            )
+            
+            # 雅可比转换：World -> Base
+            row_end = 6 if self.is_pose_mode else 3
+            jac_w = full_jac_w[:, self.body_ids_list[i], :row_end, self.jacobi_joint_ids_list[i]]
+            jac_b = torch.zeros_like(jac_w)
+            for col in range(jac_w.shape[-1]):
+                jac_b[:, :3, col] = quat_apply_inverse(root_quat_w, jac_w[:, :3, col])
+                if self.is_pose_mode:
+                    jac_b[:, 3:, col] = quat_apply_inverse(root_quat_w, jac_w[:, 3:, col])
+            
+            all_ee_pos_b.append(ee_p_b)
+            all_ee_quat_b.append(ee_q_b)
+            all_jac_b.append(jac_b)
+            all_q.append(q)
+
+        # 批量解算
+        flat_ee_pos_b = torch.cat(all_ee_pos_b, dim=0)
+        flat_ee_quat_b = torch.cat(all_ee_quat_b, dim=0)
+        flat_jac_b = torch.cat(all_jac_b, dim=0)
+        flat_q = torch.cat(all_q, dim=0)
+        flat_cmd = ik_commands.transpose(0, 1).reshape(-1, ik_commands.shape[-1])
+
+        self.diff_ik_controller.set_command(flat_cmd, ee_quat=flat_ee_quat_b)
+        flat_q_des = self.diff_ik_controller.compute(flat_ee_pos_b, flat_ee_quat_b, flat_jac_b, flat_q)
+
+        # 组装返回数据
+        target_q = self.robot.data.default_joint_pos.clone()
+        split_q_des = flat_q_des.reshape(self.num_legs, self.num_envs, -1)
+        for i in range(self.num_legs):
+            target_q[:, self.joint_ids_list[i]] = split_q_des[i]
+            
+        return target_q
+
+    def _resample_command(self, env_ids: Sequence[int]):
+        """测试用：重置时随机化 Root 位姿并初始化关节。"""
+        # 生成随机旋转和悬浮高度
+        rand_roll = (torch.rand(len(env_ids), device=self.device) - 0.5) * 1.0 
+        rand_pitch = (torch.rand(len(env_ids), device=self.device) - 0.5) * 1.0
+        rand_yaw = (torch.rand(len(env_ids), device=self.device) - 0.5) * 2 * np.pi
+        
+        self.test_root_quat[env_ids] = quat_from_euler_xyz(rand_roll, rand_pitch, rand_yaw)
+        self.test_root_pos[env_ids] = self._env.scene.env_origins[env_ids].clone()
+        self.test_root_pos[env_ids, 2] += 1.2 # 悬浮高度
+
+        # 写入物理状态
+        root_states = self.robot.data.root_state_w[env_ids].clone()
+        root_states[:, 0:3] = self.test_root_pos[env_ids]
+        root_states[:, 3:7] = self.test_root_quat[env_ids]
+        root_states[:, 7:13] = 0.0 
+        self.robot.write_root_state_to_sim(root_states, env_ids=env_ids)
+
+        # 关节归零/复位，为 IK 提供良好初值
+        default_joint_pos = self.robot.data.default_joint_pos[env_ids].clone()
+        self.robot.write_joint_state_to_sim(default_joint_pos, torch.zeros_like(default_joint_pos), env_ids=env_ids)
 
     def _update_command(self):
-        root_states = self.robot.data.root_state_w.clone()
-        root_states[:, 2] = math.sin(self.cnt)
-        root_states[:, 7:] = 0
+        """测试用：驱动 Z 轴周期运动并持续锁定 Root。"""
+        self.step_counter += 1
+        # 1. 更新测试指令中的 Z 轴偏移 [-0.2, -0.4]
+        z_dynamic = -0.3 + 0.1 * np.sin(2 * np.pi * self.step_counter / 150)
+        self.last_ik_commands[:, :, 2] = z_dynamic
+
+        # 2. 调用接口计算
+        target_q = self.compute_ik(self.test_root_pos, self.test_root_quat, self.last_ik_commands)
+
+        # 3. 强制锁定 Root 位姿并应用计算出的关节角
+        root_states = torch.zeros((self.num_envs, 13), device=self.device)
+        root_states[:, 0:3] = self.test_root_pos
+        root_states[:, 3:7] = self.test_root_quat
         self.robot.write_root_state_to_sim(root_states)
-        self.cnt += 0.01
-    
-    def _resample_command(self, env_ids: Sequence[int]):
-        pass
+        self.robot.write_joint_state_to_sim(target_q, torch.zeros_like(target_q))
+
+    @property
+    def command(self) -> torch.Tensor:
+        return self.last_ik_commands
     
     def _update_metrics(self):
         pass
-    
-    @property
-    def command(self) -> torch.Tensor:
-        return self.robot.data.default_root_state
+
+    def _set_debug_vis_impl(self, debug_vis: bool):
+        if debug_vis:
+            if not hasattr(self, "markers"):
+                self.markers = []
+                for i, name in enumerate(self.body_names):
+                    m_cfg = FRAME_MARKER_CFG.copy()
+                    m_cfg.markers["frame"].scale = (self.cfg.vis_scale,)*3
+                    self.markers.append({
+                        "cur": VisualizationMarkers(m_cfg.replace(prim_path=f"/Visuals/IK/{name}_cur")),
+                        "goal": VisualizationMarkers(m_cfg.replace(prim_path=f"/Visuals/IK/{name}_goal"))
+                    })
+        for m in self.markers:
+            m["cur"].set_visibility(debug_vis)
+            m["goal"].set_visibility(debug_vis)
+
+    def _debug_vis_callback(self, event):
+        """可视化直接读取 compute_ik 记录的位姿数据。"""
+        for i in range(self.num_legs):
+            # 1. 计算目标点（Goal）的世界坐标
+            goal_pos_b = self.last_ik_commands[:, i, 0:3]
+            goal_quat_b = self.last_ik_commands[:, i, 3:7] if self.is_pose_mode else torch.tensor([1.0, 0.0, 0.0, 0.0], device=self.device).repeat(self.num_envs, 1)
+            
+            g_p_w, g_q_w = combine_frame_transforms(self.last_root_pos_w, self.last_root_quat_w, goal_pos_b, goal_quat_b)
+            
+            # 2. 获取当前末端（Current）的世界位姿
+            ee_p_w = self.robot.data.body_state_w[:, self.body_ids_list[i], 0:3]
+            ee_q_w = self.robot.data.body_state_w[:, self.body_ids_list[i], 3:7]
+            
+            # 3. 更新可视化
+            self.markers[i]["cur"].visualize(ee_p_w, ee_q_w)
+            self.markers[i]["goal"].visualize(g_p_w, g_q_w)
+
 
 
 @configclass
 class IKCommandCfg(CommandTermCfg):
-    """Configuration for the motion command."""
-
+    
     class_type: type = IKCommand
-
+    
     asset_name: str = MISSING
+    legs_config: dict[str, list[str]] = MISSING 
+    use_pose_mode: bool = False
+    vis_scale: float = 0.1
     
-    ''' IK的关节和body名称 '''
-    # joint_names: list[str] = MISSING
-    # body_names: list[str] = MISSING
     
+    
+"""" 动作生成
+获取地形的check_points 
+加载npz的check_points -> keys
+IK插值计算每帧的qpos
+然后计算出整个轨迹的motion所需要的数据
+储存到一个motion_data中
+每个环境的一条数据可以最多跑num_epochs次,提前成功会换成下一条数据
+"""

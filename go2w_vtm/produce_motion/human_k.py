@@ -34,6 +34,7 @@ cfg = IK_and_savekey.mink_cfg("base_link",anchor,anchor_ref)
 cfg.orientation_cost = 0.6
 
 plk = IK_and_savekey.PlanningKeyframe(temp_path,cfg,save_key_path=go2w_vtm.GO2W_MJCF_DIR,save_key_name=terrain_name+"_k") # mink
+plk.set_root_targets("base_link",["FL_foot_joint_ref","FR_foot_joint_ref","RL_foot_joint_ref","RR_foot_joint_ref"])
 plk.load_relative_npz(go2w_vtm.GO2W_MJCF_DIR + "/" + terrain_name + "_k.npz")
 # plk.sync_from_model_keys()
 
@@ -42,7 +43,7 @@ plk.load_relative_npz(go2w_vtm.GO2W_MJCF_DIR + "/" + terrain_name + "_k.npz")
 with mujoco.viewer.launch_passive(plk.model, plk.data,key_callback=plk.key_callback,
                                   show_left_ui=False,show_right_ui=False) as viewer:
     plk.draw_terrain_key_pos(viewer)
-    plk.create_static_grid(viewer,0.2,1.5,rgba=[0.5,0.5,0.5,0.2],line_thickness=0.005)
+    plk.create_static_grid(viewer,0.2,1.5,rgba=[0.5,0.5,0.5,0.2],line_thickness=0.005,hide=True)
     while viewer.is_running():
         plk.update()
         mujoco.mj_forward(plk.model, plk.data)
