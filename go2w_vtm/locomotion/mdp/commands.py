@@ -1357,6 +1357,8 @@ class IKCommand(CommandTerm):
             self.last_ik_commands[:, i, 2] = -0.3         # 初始高度
 
         self.step_counter = 0
+        
+        self.train_robot: Articulation = env.scene["robot"]
 
     def compute_ik(self, root_pos_w: torch.Tensor, root_quat_w: torch.Tensor, ik_commands: torch.Tensor) -> torch.Tensor:
         """
@@ -1435,21 +1437,75 @@ class IKCommand(CommandTerm):
         self.robot.write_joint_state_to_sim(default_joint_pos, torch.zeros_like(default_joint_pos), env_ids=env_ids)
 
     def _update_command(self):
-        """测试用：驱动 Z 轴周期运动并持续锁定 Root。"""
+        """验证版：记录并对比 self.train_robot.data 在 update(0.0) 前后的差异。"""
         self.step_counter += 1
-        # 1. 更新测试指令中的 Z 轴偏移 [-0.2, -0.4]
+        # 1. 准备新数据
         z_dynamic = -0.3 + 0.1 * np.sin(2 * np.pi * self.step_counter / 150)
         self.last_ik_commands[:, :, 2] = z_dynamic
-
-        # 2. 调用接口计算
         target_q = self.compute_ik(self.test_root_pos, self.test_root_quat, self.last_ik_commands)
 
-        # 3. 强制锁定 Root 位姿并应用计算出的关节角
+        # 2. 写入数据到缓冲区 (此时仅修改了底层 Buffer)
         root_states = torch.zeros((self.num_envs, 13), device=self.device)
         root_states[:, 0:3] = self.test_root_pos
         root_states[:, 3:7] = self.test_root_quat
+        
+        robot_pre_data = {
+            "robot_root_state_w": self.robot.data.root_state_w.clone(),
+            "robot_body_pos_w": self.robot.data.body_pos_w.clone(),
+            "robot_joint_pos": self.robot.data.joint_pos.clone(),
+        }
+        
         self.robot.write_root_state_to_sim(root_states)
         self.robot.write_joint_state_to_sim(target_q, torch.zeros_like(target_q))
+
+        # === [ 记录：UPDATE 之前 ] ===
+        # 我们把此时 train_robot.data 的状态存下来
+        pre_data = {
+            "joint_pos": self.train_robot.data.joint_pos.clone(),
+            "joint_vel": self.train_robot.data.joint_vel.clone(),
+            "joint_acc": self.train_robot.data.joint_acc.clone(),
+            "body_pos": self.train_robot.data.body_pose_w[..., 0:3].clone(),
+            "body_quat": self.train_robot.data.body_pose_w[..., 3:7].clone(),
+            "body_vel": self.train_robot.data.body_lin_vel_w.clone(),
+            "body_acc": self.train_robot.data.body_lin_acc_w.clone(),
+            "body_ang_vel": self.train_robot.data.body_ang_vel_w.clone(),
+            "body_ang_acc": self.train_robot.data.body_ang_acc_w.clone(),
+        }
+
+        # 3. 会更新FK,且不影响训练的机器人的状态变化
+        self._env.scene.update(0.0)
+
+        # === [ 记录：UPDATE 之后 ] ===
+        post_data = {
+            "joint_pos": self.train_robot.data.joint_pos.clone(),
+            "joint_vel": self.train_robot.data.joint_vel.clone(),
+            "joint_acc": self.train_robot.data.joint_acc.clone(),
+            "body_pos": self.train_robot.data.body_pose_w[..., 0:3].clone(),
+            "body_quat": self.train_robot.data.body_pose_w[..., 3:7].clone(),
+            "body_vel": self.train_robot.data.body_lin_vel_w.clone(),
+            "body_acc": self.train_robot.data.body_lin_acc_w.clone(),
+            "body_ang_vel": self.train_robot.data.body_ang_vel_w.clone(),
+            "body_ang_acc": self.train_robot.data.body_ang_acc_w.clone(),
+        }
+        
+        robot_post_data = {
+            "robot_root_state_w": self.robot.data.root_state_w.clone(),
+            "robot_body_pos_w": self.robot.data.body_pos_w.clone(),
+            "robot_joint_pos": self.robot.data.joint_pos.clone(),
+        }
+
+        # 4. 自动检查并打印
+        # if self.step_counter % 50 == 1:
+        print(f"\n--- 数据一致性检查 (Step {self.step_counter}) ---")
+        for key in pre_data.keys():
+            diff = torch.norm(post_data[key] - pre_data[key]).item()
+            status = "已更新 [CHANGE]" if diff > 1e-6 else "完全相同 [STABLE]"
+            print(f"属性 {key:15}: {status} | 差异绝对值: {diff:.8f}")
+        print("-" * 45)
+        for key in robot_post_data.keys():
+            diff = torch.norm(robot_post_data[key] - robot_pre_data[key]).item()
+            status = "已更新 [CHANGE]" if diff > 1e-6 else "完全相同 [STABLE]"
+            print(f"机器人属性 {key:15}: {status} | 差异绝对值: {diff:.8f}")
 
     @property
     def command(self) -> torch.Tensor:
