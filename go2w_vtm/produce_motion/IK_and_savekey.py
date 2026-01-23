@@ -492,29 +492,26 @@ class PlanningKeyframe:
     def compute_and_store_interpolated_frames(self, cmd_vel=(0.5, 0.0, 0.0), fps: int = 50):
         """
         函数 2: 计算全部帧并储存。
-        将结果还原为世界坐标系下的 mocap 数据，存入 keyframe_data。
         """
         if not hasattr(self, 'interpolator'):
             print("❌ Please call load_interpolator_config first!")
             return
 
-        # 1. 准备输入 (batch_size = 1)
+        # 1. 准备输入
         terrain_tensor = torch.from_numpy(self.terrain.terrain_key_pos).float().to("cuda").unsqueeze(0)
         cmd_tensor = torch.tensor(cmd_vel, device="cuda").float().unsqueeze(0)
 
-        # 2. 并行计算全量帧
-        # result 包含: root_pos, root_quat, target_rel_pos, target_rel_quat
-        result = self.interpolator.interpolate(terrain_tensor, cmd_tensor, fps=fps)
+        # 2. 并行计算全量帧 (解包为两个 Tensor)
+        root_pose_w_seq, targets_pose_b_seq = self.interpolator.interpolate(terrain_tensor, cmd_tensor, fps=fps)
         
-        # 3. 数据回流：清空旧数据，填充新帧
+        # 3. 清空旧数据
         self.keyframe_data.clear()
-        num_frames = result["root_pos"].shape[1]
+        num_frames = root_pose_w_seq.shape[1]
         
-        # 提取 Tensor 到 CPU (Index 0)
-        r_pos_seq = result["root_pos"][0].cpu().numpy()
-        r_quat_seq = result["root_quat"][0].cpu().numpy()
-        t_rel_pos_seq = result["target_rel_pos"][0].cpu().numpy()
-        t_rel_quat_seq = result["target_rel_quat"][0].cpu().numpy()
+        # 提取到 CPU 以便 MuJoCo 循环填充 (取 batch 0)
+        # root_pose: [frames, 7], targets_pose: [frames, N, 7]
+        r_pose_seq = root_pose_w_seq[0].cpu().numpy()
+        t_pose_b_seq = targets_pose_b_seq[0].cpu().numpy()
 
         print(f"🔄 Storing {num_frames} interpolated frames...")
 
@@ -523,41 +520,41 @@ class PlanningKeyframe:
             kd.name = f"interp_{f:04d}"
             kd.time = f / fps
             
-            # 初始化本帧全量 mocap 数据
+            # 初始化本帧 mocap 数据
             m_pos = np.zeros((self.model.nmocap, 3))
             m_quat = np.tile([1, 0, 0, 0], (self.model.nmocap, 1)).astype(np.float64)
 
             # --- A. 还原 Root ---
-            curr_r_pos = r_pos_seq[f]
-            curr_r_quat = r_quat_seq[f]
+            # r_pose_seq[f] 结构为 [x, y, z, qw, qx, qy, qz]
+            curr_r_pos = r_pose_seq[f, 0:3]
+            curr_r_quat = r_pose_seq[f, 3:7]
             m_pos[self.root_mocap_id] = curr_r_pos
             m_quat[self.root_mocap_id] = curr_r_quat
 
-            # --- B. 还原 Targets (从 Root 坐标系转回世界坐标系) ---
+            # --- B. 还原 Targets (相对 -> 世界) ---
             for i, t_id in enumerate(self.target_mocap_ids):
-                # 利用 _get_world_pose 将相对位姿转为世界位姿
-                w_p, w_q = self._get_world_pose(
-                    curr_r_pos, 
-                    curr_r_quat, 
-                    t_rel_pos_seq[f, i], 
-                    t_rel_quat_seq[f, i]
-                )
+                # t_pose_b_seq[f, i] 也是 7D
+                rel_p = t_pose_b_seq[f, i, 0:3]
+                rel_q = t_pose_b_seq[f, i, 3:7]
+                
+                # 利用你现有的 _get_world_pose 函数
+                w_p, w_q = self._get_world_pose(curr_r_pos, curr_r_quat, rel_p, rel_q)
+                
                 m_pos[t_id] = w_p
                 m_quat[t_id] = w_q
             
             kd.mocap_pos = m_pos
             kd.mocap_quat = m_quat
-            # 只有第一帧携带 qpos，后续由预览时的 IK 实时解算
             kd.qpos = self.data.qpos.copy() if f == 0 else None
             
             self.keyframe_data.keys_in_memory.append(kd)
 
-        # 更新 PlanningKeyframe 状态以便 UI 预览
+        # UI 状态更新
         self.nkey = len(self.keyframe_data.keys_in_memory)
         self.key_edited_status = [True] * self.nkey
         self.key_id = 0
         self.change_key = True
-        print(f"✅ All frames stored. Ready for playback.")
+        print(f"✅ All {self.nkey} frames stored.")
 
 
     ''' 渲染 '''

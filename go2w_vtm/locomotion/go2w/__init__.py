@@ -85,3 +85,14 @@ gym.register(
         "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:Go2WRoughMimicPPOGRURunnerCfg",
     },
 )
+
+
+gym.register(
+    id="Rough-Multi-Motion-GRU-Unitree-Go2W",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.rough_multi_motion_env_cfg:UnitreeGo2WMultiMotionEnvCfg",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:Go2WRoughMultiMotionPPOGRURunnerCfg",
+    },
+)

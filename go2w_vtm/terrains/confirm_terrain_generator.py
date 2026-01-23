@@ -11,6 +11,8 @@ class ConfirmTerrainGenerator(TerrainGenerator):
         self.difficulty_map = None
         self.terrain_type_map = None
         self.terrain_type_names = None
+        self.terrain_name2type = None
+        self.terrain_type2name = None
         # terrains_checkpoint_data 保存每个 terrains 的 checkpoint 数据(pos_w)
         self.terrains_checkpoint_data: dict[tuple[int, int], np.ndarray] = {}
         self.num_rows = cfg.num_rows
@@ -35,6 +37,8 @@ class ConfirmTerrainGenerator(TerrainGenerator):
         difficulty_map_np = np.zeros((self.cfg.num_rows, self.cfg.num_cols), dtype=np.float32)
         terrain_type_map_np = np.zeros((self.cfg.num_rows, self.cfg.num_cols), dtype=np.int32)
         self.terrain_type_names = list(self.cfg.sub_terrains.keys())
+        self.terrain_name2type = {name:i for i,name in enumerate(self.terrain_type_names)}
+        self.terrain_type2name = {i:name for i,name in enumerate(self.terrain_type_names)}
 
         for sub_col in range(self.cfg.num_cols):
             terrain_type_id = sub_indices[sub_col]  #  当前列的地形类型 ID
@@ -65,12 +69,12 @@ class ConfirmTerrainGenerator(TerrainGenerator):
         self.terrain_type_map = torch.from_numpy(terrain_type_map_np).to(self.device)  # 保存
                 
     @property
-    def difficulty(self):
+    def difficulty(self)->torch.Tensor:
         """Shape: [num_rows, num_cols], value = difficulty level."""
         return self.difficulty_map
 
     @property
-    def terrain_types(self):
+    def terrain_types(self)->torch.Tensor:
         """Shape: [num_rows, num_cols], value = type_id (int)."""
         return self.terrain_type_map
     

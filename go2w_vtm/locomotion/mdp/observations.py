@@ -196,6 +196,7 @@ def joint_pos_w(
     joint_pos_rel[:, wheel_asset_cfg.joint_ids] = 0
     return joint_pos_rel
 
+
 ''' mimic '''
 from isaaclab.utils.math import matrix_from_quat, subtract_frame_transforms
 from go2w_vtm.locomotion.mdp.commands import MotionCommand
@@ -283,4 +284,95 @@ def motion_commands_and_vel(env: ManagerBasedEnv, command_name: str) -> torch.Te
 def motion_velocity_command(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     """The motion command from command term in the command manager with the given name."""
     command: MotionCommand = env.command_manager.get_term(command_name)
+    return command.velocity_command
+
+
+
+'''  '''
+
+from go2w_vtm.locomotion.mdp.commands import MotionGenerator
+
+
+def mul_robot_anchor_ori_w(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    command: MotionGenerator = env.command_manager.get_term(command_name)
+    mat = matrix_from_quat(command.robot_anchor_quat_w)
+    return mat[..., :2].reshape(mat.shape[0], -1)
+
+
+def mul_robot_anchor_lin_vel_w(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    command: MotionGenerator = env.command_manager.get_term(command_name)
+
+    return command.robot_anchor_vel_w[:, :3].view(env.num_envs, -1)
+
+
+def mul_robot_anchor_ang_vel_w(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    command: MotionGenerator = env.command_manager.get_term(command_name)
+
+    return command.robot_anchor_vel_w[:, 3:6].view(env.num_envs, -1)
+
+
+def mul_robot_body_pos_b(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    command: MotionGenerator = env.command_manager.get_term(command_name)
+
+    num_bodies = len(command.cfg.body_names)
+    pos_b, _ = subtract_frame_transforms(
+        command.robot_anchor_pos_w[:, None, :].repeat(1, num_bodies, 1),
+        command.robot_anchor_quat_w[:, None, :].repeat(1, num_bodies, 1),
+        command.robot_body_pos_w,
+        command.robot_body_quat_w,
+    )
+
+    return pos_b.view(env.num_envs, -1)
+
+
+def mul_robot_body_ori_b(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    command: MotionGenerator = env.command_manager.get_term(command_name)
+
+    num_bodies = len(command.cfg.body_names)
+    _, ori_b = subtract_frame_transforms(
+        command.robot_anchor_pos_w[:, None, :].repeat(1, num_bodies, 1),
+        command.robot_anchor_quat_w[:, None, :].repeat(1, num_bodies, 1),
+        command.robot_body_pos_w,
+        command.robot_body_quat_w,
+    )
+    mat = matrix_from_quat(ori_b)
+    return mat[..., :2].reshape(mat.shape[0], -1)
+
+
+def mul_motion_anchor_pos_b(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    command: MotionGenerator = env.command_manager.get_term(command_name)
+
+    pos, _ = subtract_frame_transforms(
+        command.robot_anchor_pos_w,
+        command.robot_anchor_quat_w,
+        command.anchor_pos_w,
+        command.anchor_quat_w,
+    )
+
+    return pos.view(env.num_envs, -1)
+
+
+def mul_motion_anchor_ori_b(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    command: MotionGenerator = env.command_manager.get_term(command_name)
+
+    _, ori = subtract_frame_transforms(
+        command.robot_anchor_pos_w,
+        command.robot_anchor_quat_w,
+        command.anchor_pos_w,
+        command.anchor_quat_w,
+    )
+    mat = matrix_from_quat(ori)
+    return mat[..., :2].reshape(mat.shape[0], -1)
+
+
+
+def mul_motion_commands_and_vel(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    """The motion command from command term in the command manager with the given name."""
+    command: MotionGenerator = env.command_manager.get_term(command_name)
+    return command.command_with_vel
+
+
+def mul_motion_velocity_command(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    """The motion command from command term in the command manager with the given name."""
+    command: MotionGenerator = env.command_manager.get_term(command_name)
     return command.velocity_command

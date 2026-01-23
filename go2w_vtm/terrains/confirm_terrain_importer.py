@@ -34,12 +34,13 @@ class ConfirmTerrainImporter(TerrainImporter):
         self.env_origins = None  # assigned later when `configure_env_origins` is called
         # private variables
         self._terrain_flat_patches = dict()
-        self.difficulty = None
-        self.sub_terrain_type = None
-        self.sub_terrain_type_names = None
+        self.difficulty = None #[num_rows, num_cols]
+        self.sub_terrain_type = None # [num_rows, num_cols]
+        self.sub_terrain_type_names = None # [num_rows, num_cols]
         # terrains_checkpoint_data 保存每个 terrains 的 checkpoint 数据(pos_w,根据pos_w上插值便于对接command)
-        self.terrains_checkpoint_data: dict[tuple[int, int], np.ndarray] = None
-        self.num_rows = None
+        self.terrains_checkpoint_data: dict[tuple[int, int], np.ndarray] = None # {(row, col): [nkey,3]}
+        self.terrain_name2type = None # {name: type}
+        self.num_rows = None    
         self.num_cols = None    
 
         # auto-import the terrain based on the config
@@ -56,6 +57,8 @@ class ConfirmTerrainImporter(TerrainImporter):
                 self.sub_terrain_type = terrain_generator.terrain_types
                 self.sub_terrain_type_names = terrain_generator.terrain_type_names
                 self.terrains_checkpoint_data = terrain_generator.terrains_checkpoint_data
+                self.terrain_name2type = terrain_generator.terrain_name2type
+                self.terrain_type2name = terrain_generator.terrain_type2name
                 self.num_rows = terrain_generator.num_rows
                 self.num_cols = terrain_generator.num_cols
             else:
@@ -91,6 +94,9 @@ class ConfirmTerrainImporter(TerrainImporter):
         # 均匀环境分布
         if self.cfg.evenly_distributed:
             self.evenly_distributed_env_origins()
+            
+        #self.terrain_levels[env_ids], self.terrain_types[env_ids] 这是row 和 col
+        
 
     def evenly_distributed_env_origins(self):
         """

@@ -26,27 +26,23 @@ class MocapInterpolator:
 
     def interpolate(self, terrain_key_pos, cmd_vel, fps=50):
         """
-        terrain_key_pos: [num_envs, num_keys, 3]
-        cmd_vel: [num_envs, 3]
+        返回: 
+            root_pose_w: [envs, total_frames, 7] (World frame)
+            targets_pose_b: [envs, total_frames, N, 7] (Relative to root)
         """
         num_envs = terrain_key_pos.shape[0]
         gravity = torch.tensor([0, 0, -9.81], device=self.device)
         
-        # 1. 计算 Root 的全局目标位置 (envs, keys, 3)
-        # 根据需求：相对于第一个坐标系，这里直接加上 terrain 偏移
+        # --- 1 & 2 & 3: 位置计算与速度规划 (保持原逻辑) ---
         root_abs_pos = terrain_key_pos + self.root_pos_offsets.unsqueeze(0)
-        
-        # 2. 时间分配 (基于 Root 移动距离)
         diffs = root_abs_pos[:, 1:] - root_abs_pos[:, :-1]
         dist_xy = torch.norm(diffs[..., :2], dim=-1)
         v_xy_cmd = torch.norm(cmd_vel[..., :2], dim=-1).unsqueeze(1)
         dt = torch.clamp(dist_xy / (v_xy_cmd + 1e-6), min=0.1, max=2.0)
         
-        # 针对跳跃节点进行时间压缩 (逻辑同前)
         is_jump = torch.tensor(["jump" in n and "pre" not in n for n in self.key_names[:-1]], device=self.device)
         dt = torch.where(is_jump, dt * 0.8, dt)
         
-        # 3. 边界速度规划 (Root)
         v_k = torch.zeros((num_envs, self.num_keys, 3), device=self.device)
         v_k[:, :] = cmd_vel.unsqueeze(1)
         for i in range(self.num_keys - 1):
@@ -56,15 +52,15 @@ class MocapInterpolator:
                 v_k[:, i] = v_launch
                 v_k[:, i+1] = v_launch + gravity * dt_i
 
-        # 4. 插值生成轨迹
-        all_root_pos, all_root_quat = [], []
-        all_target_pos, all_target_quat = [], []
+        # --- 4: 插值生成 ---
+        all_root_pose = []
+        all_targets_pose = []
 
         for i in range(self.num_keys - 1):
+            # 这里的 steps 取所有环境该段最大的 dt，以保证拼接对齐
             steps = max(int(fps * torch.max(dt[:, i]).item()), 2)
-            # t: [1, steps, 1]
-            t = torch.linspace(0, 1, steps, device=self.device).view(1, -1, 1)
-            dt_i = dt[:, i].view(-1, 1, 1)
+            t = torch.linspace(0, 1, steps, device=self.device).view(1, -1, 1) # [1, steps, 1]
+            dt_i = dt[:, i].view(-1, 1, 1) # [envs, 1, 1]
             
             # --- Root Pos ---
             p0, p1, v0, v1 = root_abs_pos[:, i:i+1], root_abs_pos[:, i+1:i+2], v_k[:, i:i+1], v_k[:, i+1:i+2]
@@ -74,32 +70,68 @@ class MocapInterpolator:
                 t2, t3 = t**2, t**3
                 h00, h10, h01, h11 = 2*t3-3*t2+1, (t3-2*t2+t)*dt_i, -2*t3+3*t2, (t3-t2)*dt_i
                 pos_t = h00*p0 + h10*v0 + h01*p1 + h11*v1
+            # 此时 pos_t 形状为 [envs, steps, 3]
 
-            # --- Root Quat ---
+            # --- Root Quat (核心修正点 1) ---
             q0, q1 = self.root_quats[i], self.root_quats[i+1]
-            quat_t = torch.nn.functional.normalize(q0.view(1, 1, 4) + (q1 - q0).view(1, 1, 4) * t, p=2, dim=-1)
+            # 计算单环境插值：[1, steps, 4]
+            quat_t_single = torch.nn.functional.normalize(q0.view(1, 1, 4) + (q1 - q0).view(1, 1, 4) * t, p=2, dim=-1)
+            # 扩展到所有环境：[envs, steps, 4]
+            quat_t = quat_t_single.expand(num_envs, -1, -1)
             
-            # --- Targets Rel Pose ---
+            # --- Targets Rel Pose (核心修正点 2) ---
             tp0, tp1 = self.target_rel_pos[i], self.target_rel_pos[i+1]
             tq0, tq1 = self.target_rel_quats[i], self.target_rel_quats[i+1]
             
-            # 使用 transpose 确保返回 [1, steps, N_targets, 3/4]
-            target_p_t = (tp0.unsqueeze(1) + (tp1 - tp0).unsqueeze(1) * t).transpose(0, 1).unsqueeze(0)
-            target_q_t = torch.nn.functional.normalize(
-                (tq0.unsqueeze(1) + (tq1 - tq0).unsqueeze(1) * t).transpose(0, 1), p=2, dim=-1
-            ).unsqueeze(0)
+            # 计算单环境目标插值: [steps, N, 3/4]
+            # 这里使用了广播技巧，将 [N, 3] 和 [1, steps, 1] 结合
+            t_pos_t_single = tp0.unsqueeze(0).unsqueeze(0) + (tp1 - tp0).unsqueeze(0).unsqueeze(0) * t.unsqueeze(-1)
+            t_quat_t_single = torch.nn.functional.normalize(
+                tq0.unsqueeze(0).unsqueeze(0) + (tq1 - tq0).unsqueeze(0).unsqueeze(0) * t.unsqueeze(-1), 
+                p=2, dim=-1
+            )
+            t_pos_t = t_pos_t_single.expand(num_envs, -1, -1, -1)
+            t_quat_t = t_quat_t_single.expand(num_envs, -1, -1, -1)
 
-            # 拼接段落逻辑
+            # 拼接 7D Pose
+            root_pose_t = torch.cat([pos_t, quat_t], dim=-1) # [envs, steps, 7] -> 此时维度匹配
+            targets_pose_t = torch.cat([t_pos_t, t_quat_t], dim=-1) # [envs, steps, N, 7]
+
             cut = -1 if i < self.num_keys - 2 else None
-            all_root_pos.append(pos_t[:, :cut])
-            all_root_quat.append(quat_t[:, :cut])
-            all_target_pos.append(target_p_t[:, :cut])
-            all_target_quat.append(target_q_t[:, :cut])
+            all_root_pose.append(root_pose_t[:, :cut])
+            all_targets_pose.append(targets_pose_t[:, :cut])
 
-        # 返回格式: Dict 包含 Root 绝对轨迹和 Targets 相对轨迹
-        return {
-            "root_pos": torch.cat(all_root_pos, dim=1),       # [envs, total_frames, 3]
-            "root_quat": torch.cat(all_root_quat, dim=1),     # [envs, total_frames, 4]
-            "target_rel_pos": torch.cat(all_target_pos, dim=1),   # [envs, total_frames, N, 3]
-            "target_rel_quat": torch.cat(all_target_quat, dim=1)  # [envs, total_frames, N, 4]
-        }
+        return torch.cat(all_root_pose, dim=1), torch.cat(all_targets_pose, dim=1)
+        
+    
+    def get_total_frames_per_env(self, terrain_key_pos, cmd_vel, fps=50):
+        """
+        计算每个环境各自的总帧数。
+        输入: terrain_key_pos [num_envs, num_keys, 3], cmd_vel [num_envs, 3]
+        输出: total_frames_per_env [num_envs] (LongTensor)
+        """
+        num_envs = terrain_key_pos.shape[0]
+        
+        # 1. 计算 Root 全局目标位置
+        root_abs_pos = terrain_key_pos + self.root_pos_offsets.unsqueeze(0)
+        
+        # 2. 计算每段的时间 dt: [num_envs, num_keys - 1]
+        diffs = root_abs_pos[:, 1:] - root_abs_pos[:, :-1]
+        dist_xy = torch.norm(diffs[..., :2], dim=-1)
+        v_xy_cmd = torch.norm(cmd_vel[..., :2], dim=-1).unsqueeze(1)
+        dt = torch.clamp(dist_xy / (v_xy_cmd + 1e-6), min=0.1, max=2.0)
+        
+        # 针对跳跃节点进行时间压缩
+        is_jump = torch.tensor(["jump" in n and "pre" not in n for n in self.key_names[:-1]], device=self.device)
+        dt = torch.where(is_jump, dt * 0.8, dt)
+        
+        # 3. 计算每一段的帧数: [num_envs, num_keys - 1]
+        # 注意：这里去掉了 .item()，保持 Tensor 计算
+        steps_per_segment = torch.clamp((fps * dt).long(), min=2)
+        
+        # 4. 根据插值逻辑计算总帧数
+        # 除最后一段外贡献 steps - 1，最后一段贡献 steps
+        # 等价于: sum(steps_per_segment) - (num_segments - 1)
+        total_frames = torch.sum(steps_per_segment, dim=1) - (self.num_keys - 2)
+                
+        return total_frames

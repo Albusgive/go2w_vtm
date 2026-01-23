@@ -228,27 +228,27 @@ CONFIRM_TERRAIN_CFG2 = ConfirmTerrainGeneratorCfg(
     curriculum=True, # 要开才能获取自定义地形和地形位置(有规律的)
     # color_scheme="random",
     sub_terrains={
-        "mimic_trench": terrain_gen.BoxTrenchTerrainCfg(
-            # proportion=0.5, 
+        # "mimic_trench": terrain_gen.BoxTrenchTerrainCfg(
+        #     # proportion=0.5, 
             
-            terrain_x = 1.0,                                  
-            trench_width = (0.2,0.45),
-            trench_depth = 1.5,
+        #     terrain_x = 1.0,                                  
+        #     trench_width = (0.2,0.45),
+        #     trench_depth = 1.5,
             
-            robot_origin_x = 0.8,
+        #     robot_origin_x = 0.8,
                 
-            save_to_mjcf = True,
-            mesh_path = go2w_vtm.GO2W_MJCF_DIR + "/meshs/",
-            mjcf_path = go2w_vtm.GO2W_MJCF_DIR,
+        #     save_to_mjcf = True,
+        #     mesh_path = go2w_vtm.GO2W_MJCF_DIR + "/meshs/",
+        #     mjcf_path = go2w_vtm.GO2W_MJCF_DIR,
             
-            terrain_name = "test_box_trench_terrain"
-        ),
-        "mimic_high_platform": terrain_gen.BoxHighPlatformTerrainCfg(
+        #     terrain_name = "test_box_trench_terrain"
+        # ),
+        "high_platform": terrain_gen.BoxHighPlatformTerrainCfg(
             # proportion=0.5, 
             
             terrain_x = 1.0,                                  
             platform_width = 1.0,
-            platform_height = (0.2,0.45),
+            platform_height = (0.2,0.6),
             
             robot_origin_x = 0.8,
                 
