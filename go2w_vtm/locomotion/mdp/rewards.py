@@ -1122,6 +1122,75 @@ def motion_global_body_angular_velocity_error_exp(
     return torch.exp(-error.mean(-1) / std**2)
 
 
+'''     multi motion    '''
+from isaaclab.utils.math import quat_error_magnitude
+from go2w_vtm.locomotion.mdp.commands import MotionGenerator
+def motion_generator_get_body_indexes(command: MotionGenerator, body_names: list[str] | None) -> list[int]:
+    if body_names is None:
+        return command.body_indexes
+    else:
+        body_indexes = torch.tensor(
+            command.robot.find_bodies(body_names, preserve_order=True)[0], dtype=torch.long, device=command.device
+        )
+        return body_indexes
+
+def mul_motion_global_anchor_position_error_exp(env: ManagerBasedRLEnv, command_name: str, std: float) -> torch.Tensor:
+    command: MotionGenerator = env.command_manager.get_term(command_name)
+    error = torch.sum(torch.square(command.anchor_pos_w - command.robot_anchor_pos_w), dim=-1)
+    return torch.exp(-error / std**2)
+
+
+def mul_motion_global_anchor_orientation_error_exp(env: ManagerBasedRLEnv, command_name: str, std: float) -> torch.Tensor:
+    command: MotionGenerator = env.command_manager.get_term(command_name)
+    error = quat_error_magnitude(command.anchor_quat_w, command.robot_anchor_quat_w) ** 2
+    return torch.exp(-error / std**2)
+
+
+def mul_motion_relative_body_position_error_exp(
+    env: ManagerBasedRLEnv, command_name: str, std: float, body_names: list[str] | None = None
+) -> torch.Tensor:
+    command: MotionGenerator = env.command_manager.get_term(command_name)
+    body_indexes = motion_generator_get_body_indexes(command, body_names)
+    error = torch.sum(
+        torch.square(command.body_pos_relative_w[:, body_indexes] - command.robot_body_pos_w[:, body_indexes]), dim=-1
+    )
+    return torch.exp(-error.mean(-1) / std**2)
+
+
+def mul_motion_relative_body_orientation_error_exp(
+    env: ManagerBasedRLEnv, command_name: str, std: float, body_names: list[str] | None = None
+) -> torch.Tensor:
+    command: MotionGenerator = env.command_manager.get_term(command_name)
+    body_indexes = motion_generator_get_body_indexes(command, body_names)
+    error = (
+        quat_error_magnitude(command.body_quat_relative_w[:, body_indexes], command.robot_body_quat_w[:, body_indexes])
+        ** 2
+    )
+    return torch.exp(-error.mean(-1) / std**2)
+
+
+def mul_motion_global_body_linear_velocity_error_exp(
+    env: ManagerBasedRLEnv, command_name: str, std: float, body_names: list[str] | None = None
+) -> torch.Tensor:
+    command: MotionGenerator = env.command_manager.get_term(command_name)
+    body_indexes = motion_generator_get_body_indexes(command, body_names)
+    error = torch.sum(
+        torch.square(command.body_lin_vel_w[:, body_indexes] - command.robot_body_lin_vel_w[:, body_indexes]), dim=-1
+    )
+    return torch.exp(-error.mean(-1) / std**2)
+
+
+def mul_motion_global_body_angular_velocity_error_exp(
+    env: ManagerBasedRLEnv, command_name: str, std: float, body_names: list[str] | None = None
+) -> torch.Tensor:
+    command: MotionGenerator = env.command_manager.get_term(command_name)
+    body_indexes = motion_generator_get_body_indexes(command, body_names)
+    error = torch.sum(
+        torch.square(command.body_ang_vel_w[:, body_indexes] - command.robot_body_ang_vel_w[:, body_indexes]), dim=-1
+    )
+    return torch.exp(-error.mean(-1) / std**2)
+
+
 def feet_contact_time(env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg, threshold: float) -> torch.Tensor:
     contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
     first_air = contact_sensor.compute_first_air(env.step_dt, env.physics_dt)[:, sensor_cfg.body_ids]

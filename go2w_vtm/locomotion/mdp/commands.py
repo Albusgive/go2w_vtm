@@ -1640,7 +1640,7 @@ class MotionGenerator(CommandTerm):
     @property
     def command(self) -> torch.Tensor:
         # 拼接：[目标速度(3), 目标关节位置(N), 目标关节速度(N)]
-        return torch.cat([self._cmd_vel, self.joint_pos, self.joint_vel], dim=1)
+        return torch.cat([self.joint_pos, self.joint_vel], dim=1)
     
     @property
     def velocity_command(self) -> torch.Tensor:
@@ -1843,17 +1843,29 @@ class MotionGenerator(CommandTerm):
         H = -(sampling_probabilities * (sampling_probabilities + 1e-12).log()).sum()
         self.metrics["sampling_entropy"][:] = H / math.log(self.adaptive_bins)
         
-    def _resample_command(self, env_ids: Sequence[int]):
+    def _resample_command(self, env_ids: torch.Tensor):
+        # 1. 轨迹重新插值与自适应采样 (保持原有逻辑)
         self._compute_interpolation(env_ids)
         self._adaptive_sampling(env_ids)
-        steps = self.time_steps[env_ids]
-        root_pose = self.interpolator_root_pose_w[env_ids, steps]
-        initial_joint_pos = self.robot.data.default_joint_pos[env_ids]
+        # 2. 获取采样时间步对应的目标参考数据
+        ee_targets_b = self.interpolator_tergets_pose_b[torch.arange(self.num_envs, device=self.device), self.time_steps]
+        # 接下来进行 IK 解算
+        with torch.no_grad():
+            target_q = self.ik_cmd.compute_ik(ee_targets_b)
+        # 写入真实机器人
+        root_pose_ref = self.interpolator_root_pose_w[env_ids, self.time_steps[env_ids]]
+        root_states = torch.zeros((len(env_ids), 13), device=self.device)
+        root_states[:, 0:3] = root_pose_ref[:, :3]
+        root_states[:, 3:7] = root_pose_ref[:, 3:7]
+        root_states[:, 7:13] = 0.0 # 重置时速度清零
+        self.robot.write_root_state_to_sim(root_states, env_ids=env_ids)
+        self.robot.write_joint_state_to_sim(target_q[env_ids], torch.zeros_like(target_q[env_ids]), env_ids=env_ids)
+        # 同步影子机器人历史，防止下一帧速度爆炸
         self.ik_cmd.reset_ghost_robot(
             env_ids, 
-            root_pose[:, :3], 
-            root_pose[:, 3:], 
-            initial_joint_pos
+            root_pose_ref[:, :3], 
+            root_pose_ref[:, 3:7], 
+            target_q[env_ids]
         )
 
     def _update_command(self):

@@ -1,282 +1,3 @@
-class IKCommand(CommandTerm):
-    cfg: IKCommandCfg
-
-    def __init__(self, cfg: IKCommandCfg, env: ManagerBasedRLEnv):
-        # 1. 初始化基础属性
-        self.robot: Articulation = env.scene[cfg.asset_name]
-        self.body_names = list(cfg.legs_config.keys())
-        self.num_legs = len(self.body_names)
-        self.is_pose_mode = cfg.use_pose_mode
-        self.device = env.device
-        
-        # 2. 调用基类
-        super().__init__(cfg, env)
-
-        # 3. 解析索引
-        self.cmd_type = "pose" if self.is_pose_mode else "position"
-        self.joint_ids_list = []
-        self.body_ids_list = []
-        self.jacobi_joint_ids_list = []
-        
-        for body_name in self.body_names:
-            joint_names = cfg.legs_config[body_name]
-            leg_entity_cfg = SceneEntityCfg(cfg.asset_name, joint_names=joint_names, body_names=[body_name])
-            leg_entity_cfg.resolve(env.scene)
-            self.joint_ids_list.append(leg_entity_cfg.joint_ids)
-            self.body_ids_list.append(leg_entity_cfg.body_ids[0])
-            
-            if self.robot.is_fixed_base:
-                self.jacobi_joint_ids_list.append(leg_entity_cfg.joint_ids)
-            else:
-                self.jacobi_joint_ids_list.append([idx + 6 for idx in leg_entity_cfg.joint_ids])
-
-        # 4. 控制器配置
-        total_ik_envs = self.num_envs * self.num_legs
-        diff_ik_cfg = DifferentialIKControllerCfg(
-            command_type=self.cmd_type,
-            use_relative_mode=False,
-            ik_method="dls",
-            ik_params={"lambda_val": 0.03}
-        )
-        self.diff_ik_controller = DifferentialIKController(diff_ik_cfg, num_envs=total_ik_envs, device=self.device)
-        
-        # 5. 【新增】状态缓存：用于存储参考机器人的完整 FK 结果
-        self.num_joints = self.robot.num_joints
-        self.num_bodies = self.robot.num_bodies
-        
-        # 关节空间
-        self.joint_pos = torch.zeros((self.num_envs, self.num_joints), device=self.device)
-        self.joint_vel = torch.zeros((self.num_envs, self.num_joints), device=self.device)
-        
-        # 笛卡尔空间 (Body)
-        self.body_pos_w = torch.zeros((self.num_envs, self.num_bodies, 3), device=self.device)
-        self.body_quat_w = torch.zeros((self.num_envs, self.num_bodies, 4), device=self.device)
-        self.body_lin_vel_w = torch.zeros((self.num_envs, self.num_bodies, 3), device=self.device)
-        self.body_ang_vel_w = torch.zeros((self.num_envs, self.num_bodies, 3), device=self.device)
-
-        # 历史记录 (用于差分计算)
-        self._prev_joint_pos = torch.zeros_like(self.joint_pos)
-        self._prev_body_pos_w = torch.zeros_like(self.body_pos_w)
-        self._prev_body_quat_w = torch.zeros_like(self.body_quat_w)
-
-        # 可视化数据缓存
-        self.pose_len = 7 if self.is_pose_mode else 3
-        self.last_ik_commands = torch.zeros((self.num_envs, self.num_legs, self.pose_len), device=self.device)
-
-    def get_jacobians_b(self, leg_idx: int) -> torch.Tensor:
-        jacobi_body_idx = self.body_ids_list[leg_idx]
-        if self.robot.is_fixed_base:
-            jacobi_body_idx -= 1
-        
-        jac_w = self.robot.root_physx_view.get_jacobians()[:, jacobi_body_idx, :, self.jacobi_joint_ids_list[leg_idx]]
-        base_rot_matrix = matrix_from_quat(quat_inv(self.robot.data.root_quat_w))
-        
-        jac_b = torch.zeros_like(jac_w)
-        jac_b[:, :3, :] = torch.bmm(base_rot_matrix, jac_w[:, :3, :])
-        jac_b[:, 3:, :] = torch.bmm(base_rot_matrix, jac_w[:, 3:, :])
-        return jac_b
-
-    def compute_ik(self, ik_commands: torch.Tensor) -> torch.Tensor:
-        """纯 IK 解算逻辑"""
-        _ik_commands = ik_commands[:, :, :self.pose_len]
-        all_ee_pos_b, all_ee_quat_b, all_jac_b, all_q = [], [], [], []
-
-        for i in range(self.num_legs):
-            all_q.append(self.robot.data.joint_pos[:, self.joint_ids_list[i]])
-            ee_p_b, ee_q_b = subtract_frame_transforms(
-                self.robot.data.root_pos_w, self.robot.data.root_quat_w, 
-                self.robot.data.body_pos_w[:, self.body_ids_list[i]], 
-                self.robot.data.body_quat_w[:, self.body_ids_list[i]]
-            )
-            all_ee_pos_b.append(ee_p_b)
-            all_ee_quat_b.append(ee_q_b)
-            
-            jac_b = self.get_jacobians_b(i)
-            row_end = 6 if self.is_pose_mode else 3
-            all_jac_b.append(jac_b[:, :row_end, :])
-
-        flat_ee_pos_b = torch.cat(all_ee_pos_b, dim=0)
-        flat_ee_quat_b = torch.cat(all_ee_quat_b, dim=0)
-        flat_jac_b = torch.cat(all_jac_b, dim=0)
-        flat_q = torch.cat(all_q, dim=0)
-        flat_cmd = _ik_commands.transpose(0, 1).reshape(-1, _ik_commands.shape[-1])
-
-        self.diff_ik_controller.set_command(flat_cmd, ee_quat=flat_ee_quat_b)
-        flat_q_des = self.diff_ik_controller.compute(flat_ee_pos_b, flat_ee_quat_b, flat_jac_b, flat_q)
-
-        target_q = self.robot.data.default_joint_pos.clone()
-        split_q_des = flat_q_des.reshape(self.num_legs, self.num_envs, -1)
-        for i in range(self.num_legs):
-            target_q[:, self.joint_ids_list[i]] = split_q_des[i]
-        return target_q
-
-    def compute_ik_and_fk(self, root_pos_w: torch.Tensor, root_quat_w: torch.Tensor, ik_commands: torch.Tensor, dt: float):
-        """ 一键式解算：包含 IK -> FK -> 速度差分
-            root_pos_w,root_quat_w 只是写入机器人的坐标
-        """
-        # 1. 解算 IK
-        target_q = self.compute_ik(ik_commands)
-        
-        # 缓存输入用于可视化
-        self.last_ik_commands[:] = ik_commands[:, :, :self.pose_len]
-
-        # 2. 写入影子机器人并更新场景
-        root_states = torch.zeros((self.num_envs, 13), device=self.device)
-        root_states[:, 0:3] = root_pos_w
-        root_states[:, 3:7] = root_quat_w
-        self.robot.write_root_state_to_sim(root_states)
-        self.robot.write_joint_state_to_sim(target_q, torch.zeros_like(target_q))
-        
-        # 物理引擎执行正向动力学
-        self._env.scene.update(0.0)
-
-        # 3. 提取最新的 FK 结果到缓存
-        self.joint_pos[:] = self.robot.data.joint_pos
-        self.body_pos_w[:] = self.robot.data.body_pos_w
-        self.body_quat_w[:] = self.robot.data.body_quat_w
-
-        # 4. 差分计算速度
-        if dt > 0:
-            self.joint_vel[:] = (self.joint_pos - self._prev_joint_pos) / dt
-            self.body_lin_vel_w[:] = (self.body_pos_w - self._prev_body_pos_w) / dt
-            
-            dq = quat_mul(self.body_quat_w, quat_inv(self._prev_body_quat_w))
-            self.body_ang_vel_w[:] = 2.0 * dq[..., 1:4] / dt
-        
-        # 5. 更新历史
-        self._prev_joint_pos[:] = self.joint_pos
-        self._prev_body_pos_w[:] = self.body_pos_w
-        self._prev_body_quat_w[:] = self.body_quat_w
-
-        return target_q
-
-    def sync_history_to_current(self, env_ids: Sequence[int]):
-        """重置时同步历史记录，防止速度差分爆炸"""
-        self._prev_joint_pos[env_ids] = self.joint_pos[env_ids]
-        self._prev_body_pos_w[env_ids] = self.body_pos_w[env_ids]
-        self._prev_body_quat_w[env_ids] = self.body_quat_w[env_ids]
-
-
-    def _resample_command(self, env_ids: Sequence[int]):
-        """测试用：重置时随机化 Root 位姿并初始化关节。"""
-        # 生成随机旋转和悬浮高度
-        rand_roll = (torch.rand(len(env_ids), device=self.device) - 0.5) * 1.0 
-        rand_pitch = (torch.rand(len(env_ids), device=self.device) - 0.5) * 1.0
-        rand_yaw = (torch.rand(len(env_ids), device=self.device) - 0.5) * 2 * np.pi
-        
-        self.test_root_quat[env_ids] = quat_from_euler_xyz(rand_roll, rand_pitch, rand_yaw)
-        self.test_root_pos[env_ids] = self._env.scene.env_origins[env_ids].clone()
-        self.test_root_pos[env_ids, 2] += 1.2 # 悬浮高度
-
-        # 写入物理状态
-        root_states = self.robot.data.root_state_w[env_ids].clone()
-        root_states[:, 0:3] = self.test_root_pos[env_ids]
-        root_states[:, 3:7] = self.test_root_quat[env_ids]
-        root_states[:, 7:13] = 0.0 
-        self.robot.write_root_state_to_sim(root_states, env_ids=env_ids)
-
-        # 关节归零/复位，为 IK 提供良好初值
-        default_joint_pos = self.robot.data.default_joint_pos[env_ids].clone()
-        self.robot.write_joint_state_to_sim(default_joint_pos, torch.zeros_like(default_joint_pos), env_ids=env_ids)
-
-    def _update_command(self):
-        """验证版：记录并对比 self.train_robot.data 在 update(0.0) 前后的差异。"""
-        self.step_counter += 1
-        
-        # 1. 动态更新 Z 高度（保留原有逻辑）
-        z_dynamic = -0.3 + 0.1 * np.sin(2 * np.pi * self.step_counter / 150)
-        self.last_ik_commands[:, :, 2] = z_dynamic
-
-        # 2. 【新增】给 test_root_pos 添加小噪声（仅用于 compute_ik 输入）
-        noise_std = 0.02  # 噪声标准差（可调）
-        pos_noise = torch.randn_like(self.test_root_pos) * noise_std
-        noisy_root_pos = self.test_root_pos + pos_noise
-
-        # 可选：限制噪声范围（防止过大偏移）
-        noisy_root_pos = torch.clamp(noisy_root_pos, 
-                                     min=self.test_root_pos - 0.05,
-                                     max=self.test_root_pos + 0.05)
-
-        # 3. 调用 IK 时使用带噪声的位置
-        target_q = self.compute_ik(noisy_root_pos, self.test_root_quat, self.last_ik_commands)
-
-        # 4. 写入数据到缓冲区（注意：这里仍写入原始 test_root_pos，保持机器人状态稳定）
-        root_states = torch.zeros((self.num_envs, 13), device=self.device)
-        root_states[:, 0:3] = self.test_root_pos      # ← 仍用无噪声的 root_pos 控制机器人
-        root_states[:, 3:7] = self.test_root_quat
-        
-        self.robot.write_root_state_to_sim(root_states)
-        self.robot.write_joint_state_to_sim(target_q, torch.zeros_like(target_q))
-
-        # 5. 更新场景
-        self._env.scene.update(0.0)
-        
-        
-    @property
-    def command(self) -> torch.Tensor:
-        return self.last_ik_commands
-    
-    def _update_metrics(self):
-        pass
-
-    def _set_debug_vis_impl(self, debug_vis: bool):
-        if debug_vis:
-            if not hasattr(self, "markers"):
-                self.markers = []
-                for i, name in enumerate(self.body_names):
-                    m_cfg = FRAME_MARKER_CFG.copy()
-                    m_cfg.markers["frame"].scale = (self.cfg.vis_scale,)*3
-                    self.markers.append({
-                        "cur": VisualizationMarkers(m_cfg.replace(prim_path=f"/Visuals/IK/{name}_cur")),
-                        "goal": VisualizationMarkers(m_cfg.replace(prim_path=f"/Visuals/IK/{name}_goal"))
-                    })
-        for m in self.markers:
-            m["cur"].set_visibility(debug_vis)
-            m["goal"].set_visibility(debug_vis)
-
-    def _debug_vis_callback(self, event):
-        """可视化直接读取 compute_ik 记录的位姿数据。"""
-        for i in range(self.num_legs):
-            # 1. 计算目标点（Goal）的世界坐标
-            goal_pos_b = self.last_ik_commands[:, i, 0:3]
-            goal_quat_b = self.last_ik_commands[:, i, 3:7] if self.is_pose_mode else torch.tensor([1.0, 0.0, 0.0, 0.0], device=self.device).repeat(self.num_envs, 1)
-            
-            g_p_w, g_q_w = combine_frame_transforms(self.robot.data.root_pos_w, self.robot.data.root_quat_w, goal_pos_b, goal_quat_b)
-            
-            # 2. 获取当前末端（Current）的世界位姿
-            ee_p_w = self.robot.data.body_state_w[:, self.body_ids_list[i], 0:3]
-            ee_q_w = self.robot.data.body_state_w[:, self.body_ids_list[i], 3:7]
-            
-            # 3. 更新可视化
-            self.markers[i]["cur"].visualize(ee_p_w, ee_q_w)
-            self.markers[i]["goal"].visualize(g_p_w, g_q_w)
-
-
-
-@configclass
-class IKCommandCfg(CommandTermCfg):
-    
-    class_type: type = IKCommand
-    
-    asset_name: str = MISSING
-    legs_config: dict[str, list[str]] = MISSING 
-    use_pose_mode: bool = False
-    vis_scale: float = 0.1
-    
-
-
-"""" 动作生成
-获取地形的check_points ✅
-加载npz的MocapInterpolator_map ✅
-motion数据结构张量 ✅
-储存到一个key_data中(envs,keys,root_pose)[envs, max_frames, 7] (envs,keys,N,targets_pose_b)[envs, max_frames,N,7] ✅
-插帧计算函数 env_ids-> 按地形分类-> 插帧-> 返回插帧数据 ,每次 _resample_command 时判断是否需要重新插帧（超过motion_max_episode） ✅
-IK更新函数 每次update_command时判断是否需要达到最大time_step_totals ，没有的选下一帧key然后进行IK计算 ✅
-在num_epochs内进行_adaptive_sampling ✅
-body_linv和body_angv可以通过差分计算 ✅
-"""
-
-
 from go2w_vtm.utils.MocapInterpolator import MocapInterpolator
 class MotionGenerator(CommandTerm):
     
@@ -329,7 +50,7 @@ class MotionGenerator(CommandTerm):
         
         # motion数据
         self.joint_indices, _ = self.robot.find_joints(self.cfg.joint_names)
-        
+
         # track
         self.robot_anchor_body_index = self.robot.body_names.index(self.cfg.anchor_body_name)
         self.motion_anchor_body_index = self.cfg.body_names.index(self.cfg.anchor_body_name)
@@ -466,9 +187,6 @@ class MotionGenerator(CommandTerm):
         """并行计算并存储插值后的 root_pose 和 target_poses"""
         if len(env_ids) == 0:
             return
-
-        # 获取这批环境的地形类型（假设 env_ids 下的地形类型一致或按类型循环）
-        # 为了高性能，我们按地形类型分组处理
         current_rows = self.terrain.terrain_levels[env_ids]
         current_cols = self.terrain.terrain_types[env_ids]
         env_terrain_types = self.sub_terrain_type_tensor[current_rows, current_cols]
@@ -549,7 +267,6 @@ class MotionGenerator(CommandTerm):
             # 记录失败
             self._current_bin_failed.index_add_(0, fail_bins, torch.ones_like(fail_bins, dtype=torch.float))
 
-
         sampling_probabilities = self.bin_failed_count + self.cfg.adaptive_uniform_ratio / float(self.adaptive_bins)
         
         # 卷积平滑 (让失败点附近的 Bin 也有更高概率被采样)
@@ -579,25 +296,17 @@ class MotionGenerator(CommandTerm):
         self.metrics["sampling_entropy"][:] = H / math.log(self.adaptive_bins)
         
     def _resample_command(self, env_ids: Sequence[int]):
-        t_env_ids = torch.tensor(env_ids, device=self.device)
-        
-        # 1. 轨迹重新插值
-        self._compute_interpolation(t_env_ids)
-        
-        # 2. 自适应采样起始帧
+        self._compute_interpolation(env_ids)
         self._adaptive_sampling(env_ids)
-
-        # 3. 计算起始帧的 IK/FK 以同步状态
-        start_ids = t_env_ids
-        steps = self.time_steps[start_ids]
-        root_pose = self.interpolator_root_pose_w[start_ids, steps]
-        ee_targets = self.interpolator_tergets_pose_b[start_ids, steps]
-        
-        # 初始化该环境的状态 (dt=0 表示不计算初始速度)
-        self.ik_cmd.compute_ik_and_fk(root_pose[:, :3], root_pose[:, 3:], ee_targets, 0.0)
-        
-        # 4. 关键：同步差分历史，防止重置瞬间速度飞出
-        self.ik_cmd.sync_history_to_current(env_ids)
+        steps = self.time_steps[env_ids]
+        root_pose = self.interpolator_root_pose_w[env_ids, steps]
+        initial_joint_pos = self.robot.data.default_joint_pos[env_ids]
+        self.ik_cmd.reset_ghost_robot(
+            env_ids, 
+            root_pose[:, :3], 
+            root_pose[:, 3:], 
+            initial_joint_pos
+        )
 
     def _update_command(self):
         # 1. 推进时间步
@@ -607,12 +316,11 @@ class MotionGenerator(CommandTerm):
         reset_mask = self.time_steps >= (self.time_step_totals - 1)
         reset_env_ids = torch.where(reset_mask)[0]
         if len(reset_env_ids) > 0:
-            self._resample_command(reset_env_ids.tolist())
+            self._resample_command(reset_env_ids)
 
         # 3. 获取当前步目标位姿
-        all_ids = torch.arange(self.num_envs, device=self.device)
-        root_pose_ref = self.interpolator_root_pose_w[all_ids, self.time_steps]
-        ee_targets_b = self.interpolator_tergets_pose_b[all_ids, self.time_steps]
+        root_pose_ref = self.interpolator_root_pose_w[:, self.time_steps]
+        ee_targets_b = self.interpolator_tergets_pose_b[:, self.time_steps]
 
         # 4. 调用迁移后的 IK+FK 一体化函数
         # 这一步会自动更新 ik_cmd 内部的 joint_pos, body_pos_w, body_vel 等全量数据

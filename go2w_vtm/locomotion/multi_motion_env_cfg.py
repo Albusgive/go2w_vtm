@@ -260,32 +260,32 @@ class RewardsCfg:
     """Reward terms for the MDP."""
 
     motion_global_anchor_pos = RewTerm(
-        func=mdp.motion_global_anchor_position_error_exp,
+        func=mdp.mul_motion_global_anchor_position_error_exp,
         weight=0.5,
         params={"command_name": "motion", "std": 0.3},
     )
     motion_global_anchor_ori = RewTerm(
-        func=mdp.motion_global_anchor_orientation_error_exp,
+        func=mdp.mul_motion_global_anchor_orientation_error_exp,
         weight=0.5,
         params={"command_name": "motion", "std": 0.4},
     )
     motion_body_pos = RewTerm(
-        func=mdp.motion_relative_body_position_error_exp,
+        func=mdp.mul_motion_relative_body_position_error_exp,
         weight=1.0,
         params={"command_name": "motion", "std": 0.3},
     )
     motion_body_ori = RewTerm(
-        func=mdp.motion_relative_body_orientation_error_exp,
+        func=mdp.mul_motion_relative_body_orientation_error_exp,
         weight=1.0,
         params={"command_name": "motion", "std": 0.4},
     )
     motion_body_lin_vel = RewTerm(
-        func=mdp.motion_global_body_linear_velocity_error_exp,
+        func=mdp.mul_motion_global_body_linear_velocity_error_exp,
         weight=1.0,
         params={"command_name": "motion", "std": 1.0},
     )
     motion_body_ang_vel = RewTerm(
-        func=mdp.motion_global_body_angular_velocity_error_exp,
+        func=mdp.mul_motion_global_body_angular_velocity_error_exp,
         weight=1.0,
         params={"command_name": "motion", "std": 3.14},
     )
@@ -315,14 +315,14 @@ class TerminationsCfg:
     """Termination terms for the MDP."""
 
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
-    # anchor_pos = DoneTerm(
-    #     func=mdp.bad_anchor_pos_z_only,
-    #     params={"command_name": "motion", "threshold": 0.2},
-    # )
-    # anchor_ori = DoneTerm(
-    #     func=mdp.bad_anchor_ori,
-    #     params={"asset_cfg": SceneEntityCfg("robot"), "command_name": "motion", "threshold": 0.8},
-    # )
+    anchor_pos = DoneTerm(
+        func=mdp.mul_bad_anchor_pos_z_only,
+        params={"command_name": "motion", "threshold": 0.2},
+    )
+    anchor_ori = DoneTerm(
+        func=mdp.mul_bad_anchor_ori,
+        params={"asset_cfg": SceneEntityCfg("robot"), "command_name": "motion", "threshold": 0.8},
+    )
     # ee_body_pos = DoneTerm(
     #     func=mdp.bad_motion_body_pos_z_only,
     #     params={

@@ -248,11 +248,11 @@ CONFIRM_TERRAIN_CFG2 = ConfirmTerrainGeneratorCfg(
             
             terrain_x = 1.0,                                  
             platform_width = 1.0,
-            platform_height = (0.2,0.6),
+            platform_height = (0.2,0.45),
             
             robot_origin_x = 0.8,
                 
-            save_to_mjcf = True,
+            save_to_mjcf = False,
             mesh_path = go2w_vtm.GO2W_MJCF_DIR + "/meshs/",
             mjcf_path = go2w_vtm.GO2W_MJCF_DIR,
             
