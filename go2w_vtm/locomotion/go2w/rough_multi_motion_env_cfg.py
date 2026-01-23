@@ -93,7 +93,7 @@ class UnitreeGo2WMultiMotionEnvCfg(MultiMotionEnvCfg):
 
         # ------------------------------Sence------------------------------
         self.scene.robot = UNITREE_GO2W_NO_MOTOR_LIMIT_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
-        self.scene.ik_robot = UNITREE_GO2W_IK_CFG.replace(prim_path="{ENV_REGEX_NS}/IKRobot")
+        self.scene.ghost_robot = UNITREE_GO2W_IK_CFG.replace(prim_path="{ENV_REGEX_NS}/IKRobot")
         # ------------------------------Terrain------------------------------
         self.scene.terrain.terrain_type = "generator"
         self.scene.terrain.terrain_generator = CONFIRM_TERRAIN_CFG2

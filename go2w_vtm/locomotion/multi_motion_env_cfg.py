@@ -71,7 +71,7 @@ class MySceneCfg(InteractiveSceneCfg):
     # robots
     robot: ArticulationCfg = MISSING
     
-    ik_robot: ArticulationCfg = MISSING
+    ghost_robot: ArticulationCfg = MISSING
     # sensors
     
     # contact_forces = ContactSensorCfg(prim_path="{ENV_REGEX_NS}/Robot/.*", history_length=3, track_air_time=True)
@@ -116,7 +116,7 @@ class CommandsCfg:
         joint_position_range=(-0.1, 0.1),
         ik_cfg = mdp.IKCommandCfg(
             resampling_time_range=(1.0e9, 1.0e9),
-            asset_name="ik_robot",
+            asset_name="ghost_robot",
             use_pose_mode=False,
         )
     )

@@ -1594,7 +1594,6 @@ class MotionGenerator(CommandTerm):
         self.interpolator_tergets_pose_b = torch.zeros(self.num_envs, max_length, num_targets, 7, device=self.device)
         
         self.ik_cmd = IKCommand(self.cfg.ik_cfg, self._env)
-        self.ik_robot = self.ik_cmd.robot
         
         # motion数据
         self.joint_indices, _ = self.robot.find_joints(self.cfg.joint_names)
