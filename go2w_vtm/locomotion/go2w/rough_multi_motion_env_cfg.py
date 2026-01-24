@@ -142,7 +142,7 @@ class UnitreeGo2WMultiMotionEnvCfg(MultiMotionEnvCfg):
         self.rewards.action_rate_l2.weight = -1e-2
         self.rewards.motion_body_pos.weight = 1.0
         self.rewards.motion_body_lin_vel.weight = 1.0
-        self.rewards.motion_global_anchor_pos.weight = 6.0
+        self.rewards.motion_global_anchor_pos.weight = 1.0
 
         # 取消轮子body的姿态和角速度rew
         self.rewards.motion_body_pos.params["body_names"] = self.body_names

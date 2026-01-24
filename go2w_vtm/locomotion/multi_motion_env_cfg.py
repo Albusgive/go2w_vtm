@@ -316,7 +316,7 @@ class TerminationsCfg:
 
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
     anchor_pos = DoneTerm(
-        func=mdp.mul_bad_anchor_pos_z_only,
+        func=mdp.mul_bad_anchor_pos,
         params={"command_name": "motion", "threshold": 0.2},
     )
     anchor_ori = DoneTerm(
