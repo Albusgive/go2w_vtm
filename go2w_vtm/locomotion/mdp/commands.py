@@ -1493,11 +1493,18 @@ class IKCommand(CommandTerm):
                         "cur": VisualizationMarkers(m_cfg.replace(prim_path=f"/Visuals/IK/{name}_cur")),
                         "goal": VisualizationMarkers(m_cfg.replace(prim_path=f"/Visuals/IK/{name}_goal"))
                     })
-        for m in self.markers:
-            m["cur"].set_visibility(debug_vis)
-            m["goal"].set_visibility(debug_vis)
+                for m in self.markers:
+                    m["cur"].set_visibility(debug_vis)
+                    m["goal"].set_visibility(debug_vis)
+        else:
+            if hasattr(self, "markers"):
+                for m in self.markers:
+                    m["cur"].set_visibility(debug_vis)
+                    m["goal"].set_visibility(debug_vis)
 
     def _debug_vis_callback(self, event):
+        if not self.robot.is_initialized:
+            return
         """可视化直接读取 compute_ik 记录的位姿数据。"""
         for i in range(self.num_legs):
             # 1. 计算目标点（Goal）的世界坐标
@@ -1537,6 +1544,12 @@ body_linv和body_angv可以通过差分计算 ✅
 效率优化 ✅：完全的ghost robot的数据读取
 """
 
+def print_tensor_memory(tensor, name="Tensor"):
+    # element_size() 返回单个元素的字节数 (例如 float32 是 4 字节)
+    # nelement() 返回张量中元素的总数
+    byte_size = tensor.nelement() * tensor.element_size()
+    mb_size = byte_size / (1024 ** 2)
+    print(f"{name} 占用显存: {byte_size} 字节 | {mb_size:.4f} MB")
 
 from go2w_vtm.utils.MocapInterpolator import MocapInterpolator
 class MotionGenerator(CommandTerm):
@@ -1584,6 +1597,7 @@ class MotionGenerator(CommandTerm):
         # 插帧数据，root和关键点
         self.interpolator_root_pose_w = torch.zeros(self.num_envs, max_length, 7, device=self.device)
         self.interpolator_tergets_pose_b = torch.zeros(self.num_envs, max_length, num_targets, 7, device=self.device)
+        self._resample_num_epochs = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
         
         self.ik_cmd = IKCommand(self.cfg.ik_cfg, self._env)
         
@@ -1726,8 +1740,12 @@ class MotionGenerator(CommandTerm):
         """并行计算并存储插值后的 root_pose 和 target_poses"""
         if len(env_ids) == 0:
             return
-        current_rows = self.terrain.terrain_levels[env_ids]
-        current_cols = self.terrain.terrain_types[env_ids]
+        self._resample_num_epochs[env_ids] += 1
+        compute_mask = self._resample_num_epochs[env_ids] < self.cfg.motion_max_episode
+        compute_ids = env_ids[compute_mask]
+        
+        current_rows = self.terrain.terrain_levels[compute_ids]
+        current_cols = self.terrain.terrain_types[compute_ids]
         env_terrain_types = self.sub_terrain_type_tensor[current_rows, current_cols]
         
         unique_types = torch.unique(env_terrain_types)
@@ -1739,7 +1757,7 @@ class MotionGenerator(CommandTerm):
                 
             # 找到当前类型匹配的子 env_ids
             type_mask = (env_terrain_types == t_type)
-            type_env_ids = env_ids[type_mask]
+            type_env_ids = compute_ids[type_mask]
             
             # 获取 Checkpoints
             m_rows = current_rows[type_mask]

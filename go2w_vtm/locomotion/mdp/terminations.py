@@ -238,3 +238,8 @@ def mul_bad_motion_body_pos_z_only(
     body_indexes = _get_body_indexes(command, body_names)
     error = torch.abs(command.body_pos_relative_w[:, body_indexes, -1] - command.robot_body_pos_w[:, body_indexes, -1])
     return torch.any(error > threshold, dim=-1)
+
+
+def test_termination_all(env: ManagerBasedRLEnv) -> torch.Tensor:
+    
+    return torch.ones(env.num_envs,dtype=torch.bool, device=env.device)

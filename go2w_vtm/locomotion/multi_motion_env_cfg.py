@@ -317,12 +317,17 @@ class TerminationsCfg:
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
     anchor_pos = DoneTerm(
         func=mdp.mul_bad_anchor_pos,
-        params={"command_name": "motion", "threshold": 0.2},
+        params={"command_name": "motion", "threshold": 0.5},
     )
     anchor_ori = DoneTerm(
         func=mdp.mul_bad_anchor_ori,
         params={"asset_cfg": SceneEntityCfg("robot"), "command_name": "motion", "threshold": 0.8},
     )
+    
+    # test_termination_all = DoneTerm(
+    #     func=mdp.test_termination_all,
+    # )
+    
     # ee_body_pos = DoneTerm(
     #     func=mdp.bad_motion_body_pos_z_only,
     #     params={
