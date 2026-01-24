@@ -111,6 +111,7 @@ class UnitreeGo2WMultiMotionEnvCfg(MultiMotionEnvCfg):
             "RR_foot": ["RR_hip_joint", "RR_thigh_joint", "RR_calf_joint"],
         }
         self.commands.motion.ik_cfg.debug_vis = True
+        self.commands.motion.motion_max_episode = 15
         # ------------------------------Observations------------------------------
         self.observations.policy.joint_pos.func = mdp.joint_pos_rel
         self.observations.policy.joint_pos.params["asset_cfg"] = SceneEntityCfg(

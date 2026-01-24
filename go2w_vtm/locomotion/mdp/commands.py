@@ -1625,9 +1625,11 @@ class MotionGenerator(CommandTerm):
         # 卷积核用于平滑采样概率
         self.kernel = torch.ones(self.cfg.adaptive_kernel_size, device=self.device) / self.cfg.adaptive_kernel_size
 
-
         # 初始化命令速度缓存 [num_envs, 3] (vx, vy, wz)
         self._cmd_vel = torch.zeros(self.num_envs, 3, device=self.device)
+        
+        
+        self._compute_interpolation(torch.arange(self.num_envs, device=self.device))    
 
         self.metrics["error_anchor_pos"] = torch.zeros(self.num_envs, device=self.device)
         self.metrics["error_anchor_rot"] = torch.zeros(self.num_envs, device=self.device)
@@ -2010,7 +2012,7 @@ class MotionGeneratorCfg(CommandTermCfg):
     body_names: list[str] = MISSING
     joint_names: list[str] = MISSING
     
-    motion_max_episode: int = 10
+    motion_max_episode: int = 10 #每重置motion_max_episode次，就重新采样一个轨迹
 
     pose_range: dict[str, tuple[float, float]] = {}
     velocity_range: dict[str, tuple[float, float]] = {}
