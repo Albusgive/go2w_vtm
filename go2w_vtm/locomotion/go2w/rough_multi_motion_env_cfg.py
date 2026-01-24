@@ -103,7 +103,7 @@ class UnitreeGo2WMultiMotionEnvCfg(MultiMotionEnvCfg):
         self.commands.motion.body_names = self.body_names
         self.commands.motion.joint_names = self.leg_joint_names
         self.commands.motion.terrain_and_checkpoint_file = {"high_platform": high_platform_path} #TODO
-        self.commands.motion.terrain_and_cmd_vel = {"high_platform": [(0.5,1.0),(0.0,0.0),(0.0,0.0)]}
+        self.commands.motion.terrain_and_cmd_vel = {"high_platform": [(0.8,1.0),(0.0,0.0),(0.0,0.0)]}
         self.commands.motion.ik_cfg.legs_config={
             "FL_foot": ["FL_hip_joint", "FL_thigh_joint", "FL_calf_joint"],
             "FR_foot": ["FR_hip_joint", "FR_thigh_joint", "FR_calf_joint"],
@@ -151,8 +151,8 @@ class UnitreeGo2WMultiMotionEnvCfg(MultiMotionEnvCfg):
         self.rewards.motion_body_ang_vel.params["body_names"] = self.body_names[:-4]
         
         # ------------------------------Termination------------------------------
-        self.terminations.anchor_pos = None
-        self.terminations.anchor_ori = None
+        # self.terminations.anchor_pos = None
+        # self.terminations.anchor_ori = None
 
         # If the weight of rewards is 0, set rewards to None
         if self.__class__.__name__ == "UnitreeGo2WMultiMotionEnvCfg":
