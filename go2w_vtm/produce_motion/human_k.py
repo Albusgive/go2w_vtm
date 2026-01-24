@@ -14,7 +14,7 @@ from go2w_vtm.produce_motion.decode_terrain import DecodeTerrain
 
 file_path = go2w_vtm.GO2W_MJCF_DIR + "/go2w_mocap.xml"
 # test_box_float_box_terrain  test_box_platform_terrain test_box_rock_fissure_terrain test_box_trench_terrain 
-terrain_name = "test_box_platform_terrain"
+terrain_name = "multi_motion_platform_terrain"
 terrain_path = go2w_vtm.GO2W_MJCF_DIR + "/" + terrain_name + ".xml"
 terrain_k_path = go2w_vtm.GO2W_MJCF_DIR + "/" + terrain_name + "_k.xml"
 temp_path = go2w_vtm.GO2W_MJCF_DIR + "/temp.xml"

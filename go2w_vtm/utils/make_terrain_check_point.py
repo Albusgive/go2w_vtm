@@ -56,6 +56,7 @@ def makeBoxHighPlatformTerrainCheckPoint(
     terrain_key_pos_list = []
     descriptions = []
     
+    #初始位置
     init_key_pos = np.array([robot_origin_x, size[1]/2, 0])
     terrain_key_pos_list.append(init_key_pos)
     descriptions.append("init")
@@ -66,26 +67,28 @@ def makeBoxHighPlatformTerrainCheckPoint(
     terrain_key_pos_list.append(middle_key_pos)
     descriptions.append("platform_edge")
 
-    
-    # 2.平台边缘 抬前腿
-    middle_key_pos = np.array([terrain_x_min - 0.1, size[1]/2, 0.1])
+    # 2.平台边缘 前腿顶住墙
+    middle_key_pos = np.array([terrain_x_min - 0.05, size[1]/2, 0.0])
     terrain_key_pos_list.append(middle_key_pos)
-    descriptions.append("platform_edge front leg up")
-
+    descriptions.append("platform_edge front leg")
     
-    # 3.平台边缘 蹬后腿 前腿搭在平台上
-    middle_key_pos = np.array([terrain_x_min, size[1]/2, _platform_height])
+    # 3.平台边缘 整个身子起来，收一条腿
+    middle_key_pos = np.array([terrain_x_min, size[1]/2, 0.0])
     terrain_key_pos_list.append(middle_key_pos)
-    descriptions.append("platform_up_edge back leg up")
+    descriptions.append("platform_up_edge back one leg up")
 
     
     # 4.平台边缘 收腿
     middle_key_pos = np.array([terrain_x_min + 0.1, size[1]/2, _platform_height])
     terrain_key_pos_list.append(middle_key_pos)
     descriptions.append("platform_up_edge leg down")
-
     
-    # 恢复姿态
+    # 5.恢复姿态
+    middle_key_pos = np.array([terrain_x_min + 0.15, size[1]/2, _platform_height])
+    terrain_key_pos_list.append(middle_key_pos)
+    descriptions.append("finished up")
+
+    # 6.结束位置
     end_key_pos = np.array([terrain_x_min + platform_width/2, size[1]/2, _platform_height])
     terrain_key_pos_list.append(end_key_pos)
     descriptions.append("end")

@@ -13,7 +13,7 @@ import time
 # mujoco.mj_loadAllPluginLibraries(plugin_path)
 
 # test_box_float_box_terrain  test_box_platform_terrain test_box_rock_fissure_terrain test_box_trench_terrain 
-terrain_name = "test_box_platform_terrain"
+terrain_name = "multi_motion_platform_terrain"
 temp_path = go2w_vtm.GO2W_MJCF_DIR + "/temp.xml"
 
 
@@ -26,7 +26,7 @@ cfg.orientation_cost = 0.6
 plk = IK_and_savekey.PlanningKeyframe(temp_path,cfg) # mink
 hz = 50
 plk.load_interpolator_config(go2w_vtm.GO2W_MJCF_DIR + "/" + terrain_name + "_k.npz")
-plk.compute_and_store_interpolated_frames((0.8,0.0,0.0),hz)
+plk.compute_and_store_interpolated_frames((1.0,0.0,0.0),hz)
 with mujoco.viewer.launch_passive(plk.model, plk.data,show_left_ui=False,show_right_ui=False) as viewer:
     plk.draw_terrain_key_pos(viewer)
     replay_k = 0

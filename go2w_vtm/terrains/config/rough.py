@@ -256,8 +256,7 @@ CONFIRM_TERRAIN_CFG2 = ConfirmTerrainGeneratorCfg(
             mesh_path = go2w_vtm.GO2W_MJCF_DIR + "/meshs/",
             mjcf_path = go2w_vtm.GO2W_MJCF_DIR,
             
-            
-            terrain_name = "test_box_platform_terrain"
+            terrain_name = "multi_motion_platform_terrain"
         ),
         
         # "test_box_rock_fissure_terrain": terrain_gen.BoxRockFissureTerrainCfg(

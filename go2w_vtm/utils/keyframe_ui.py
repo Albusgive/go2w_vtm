@@ -72,7 +72,7 @@ class ProportionalKeyframeDialog:
         # Time
         time_frame = tk.Frame(main_container, bg="#ffffff")
         time_frame.pack(fill="x", pady=(0, pad_y))
-        tk.Label(time_frame, text="Time:", bg="#ffffff", width=7, anchor="w").pack(side="left")
+        tk.Label(time_frame, text="Frame Time:", bg="#ffffff", width=7, anchor="w").pack(side="left")
         
         time_var = tk.StringVar(value=str(self.default_time))
         time_entry = tk.Entry(time_frame, textvariable=time_var, borderwidth=1, relief="solid")

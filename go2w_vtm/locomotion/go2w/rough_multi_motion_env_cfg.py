@@ -8,7 +8,7 @@ from ..multi_motion_env_cfg import ActionsCfg, MultiMotionEnvCfg, MySceneCfg
 from ..multi_motion_env_cfg import RewardsCfg
 
 import go2w_vtm
-from go2w_vtm.Robot.go2w import UNITREE_GO2W_CFG,UNITREE_GO2W_NO_MOTOR_LIMIT_CFG,UNITREE_GO2W_IK_CFG
+from go2w_vtm.Robot.go2w import UNITREE_GO2W_CFG,UNITREE_GO2W_NO_MOTOR_LIMIT_CFG,UNITREE_GO2W_GHOST_CFG
 from go2w_vtm.terrains.config.rough import MIMIC_GYM_TERRAIN_CFG,CONFIRM_TERRAIN_CFG,CONFIRM_TERRAIN_CFG2
 
 from isaaclab.utils.noise import UniformNoiseCfg
@@ -93,12 +93,12 @@ class UnitreeGo2WMultiMotionEnvCfg(MultiMotionEnvCfg):
 
         # ------------------------------Sence------------------------------
         self.scene.robot = UNITREE_GO2W_NO_MOTOR_LIMIT_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
-        self.scene.ghost_robot = UNITREE_GO2W_IK_CFG.replace(prim_path="{ENV_REGEX_NS}/IKRobot")
+        self.scene.ghost_robot = UNITREE_GO2W_GHOST_CFG.replace(prim_path="{ENV_REGEX_NS}/GhostRobot")
         # ------------------------------Terrain------------------------------
         self.scene.terrain.terrain_type = "generator"
         self.scene.terrain.terrain_generator = CONFIRM_TERRAIN_CFG2
         # ------------------------------commands------------------------------
-        high_platform_path = os.path.join(go2w_vtm.GO2W_MJCF_DIR, "test_box_platform_terrain_k.npz")
+        high_platform_path = os.path.join(go2w_vtm.GO2W_MJCF_DIR, "multi_motion_platform_terrain_k.npz")
         self.commands.motion.anchor_body_name = "base"
         self.commands.motion.body_names = self.body_names
         self.commands.motion.joint_names = self.leg_joint_names
@@ -149,6 +149,10 @@ class UnitreeGo2WMultiMotionEnvCfg(MultiMotionEnvCfg):
         self.rewards.motion_body_ori.params["body_names"] = self.body_names[:-4]
         self.rewards.motion_body_lin_vel.params["body_names"] = self.body_names
         self.rewards.motion_body_ang_vel.params["body_names"] = self.body_names[:-4]
+        
+        # ------------------------------Termination------------------------------
+        self.terminations.anchor_pos = None
+        self.terminations.anchor_ori = None
 
         # If the weight of rewards is 0, set rewards to None
         if self.__class__.__name__ == "UnitreeGo2WMultiMotionEnvCfg":

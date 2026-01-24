@@ -1291,11 +1291,13 @@ class MotionCommandCfg(CommandTermCfg):
 from isaaclab.controllers import DifferentialIKController, DifferentialIKControllerCfg
 from isaaclab.managers import SceneEntityCfg
 from typing import Literal
-from isaaclab.utils.math import subtract_frame_transforms,quat_apply_inverse, matrix_from_quat, quat_inv
+from isaaclab.utils.math import subtract_frame_transforms,quat_apply_inverse, matrix_from_quat, quat_inv,quat_box_minus
 
 class IKCommand(CommandTerm):
     cfg: IKCommandCfg
-
+    ''' 给ghost robot使用的IK计算 
+        测试:可以在_resample_command和_update_command实现
+    '''
     def __init__(self, cfg: IKCommandCfg, env: ManagerBasedRLEnv):
         # 1. 初始化基础属性
         self.robot: Articulation = env.scene[cfg.asset_name]
@@ -1334,28 +1336,45 @@ class IKCommand(CommandTerm):
         )
         self.diff_ik_controller = DifferentialIKController(diff_ik_cfg, num_envs=total_ik_envs, device=self.device)
         
-        # 5. 【新增】状态缓存：用于存储参考机器人的完整 FK 结果
-        self.num_joints = self.robot.num_joints
-        self.num_bodies = self.robot.num_bodies
-        
-        # 关节空间
-        self.joint_pos = torch.zeros((self.num_envs, self.num_joints), device=self.device)
-        self.joint_vel = torch.zeros((self.num_envs, self.num_joints), device=self.device)
-        
-        # 笛卡尔空间 (Body)
-        self.body_pos_w = torch.zeros((self.num_envs, self.num_bodies, 3), device=self.device)
-        self.body_quat_w = torch.zeros((self.num_envs, self.num_bodies, 4), device=self.device)
-        self.body_lin_vel_w = torch.zeros((self.num_envs, self.num_bodies, 3), device=self.device)
-        self.body_ang_vel_w = torch.zeros((self.num_envs, self.num_bodies, 3), device=self.device)
+        # 历史记录 (用于下一帧差分)
+        self._prev_joint_pos = torch.zeros_like(self.robot.data.joint_pos)
+        self._prev_body_pos_w = torch.zeros_like(self.robot.data.body_pos_w)
+        self._prev_body_quat_w = torch.zeros_like(self.robot.data.body_quat_w)
 
-        # 历史记录 (用于差分计算)
-        self._prev_joint_pos = torch.zeros_like(self.joint_pos)
-        self._prev_body_pos_w = torch.zeros_like(self.body_pos_w)
-        self._prev_body_quat_w = torch.zeros_like(self.body_quat_w)
+        # 差分结果存储 (供 property 读取)
+        self._joint_vel = torch.zeros_like(self._prev_joint_pos)
+        self._body_lin_vel_w = torch.zeros_like(self._prev_body_pos_w)
+        self._body_ang_vel_w = torch.zeros_like(self._prev_body_pos_w)
 
+        # IK 命令
         self.command_len = 7 if self.is_pose_mode else 3
-        
         self.ik_command = torch.zeros((self.num_envs, self.num_legs, self.command_len), device=self.device)
+    
+    # --- 位置与姿态：直接映射 robot.data (FK 结果) ---
+    @property
+    def joint_pos(self) -> torch.Tensor:
+        return self.robot.data.joint_pos
+
+    @property
+    def body_pos_w(self) -> torch.Tensor:
+        return self.robot.data.body_pos_w
+
+    @property
+    def body_quat_w(self) -> torch.Tensor:
+        return self.robot.data.body_quat_w
+
+    # --- 速度：返回差分计算后的结果缓存 ---
+    @property
+    def joint_vel(self) -> torch.Tensor:
+        return self._joint_vel
+
+    @property
+    def body_lin_vel_w(self) -> torch.Tensor:
+        return self._body_lin_vel_w
+
+    @property
+    def body_ang_vel_w(self) -> torch.Tensor:
+        return self._body_ang_vel_w
 
     def get_jacobians_b(self, leg_idx: int) -> torch.Tensor:
         jacobi_body_idx = self.body_ids_list[leg_idx]
@@ -1406,77 +1425,49 @@ class IKCommand(CommandTerm):
         return target_q
 
     def compute_ik_and_fk(self, root_pos_w: torch.Tensor, root_quat_w: torch.Tensor, ik_commands: torch.Tensor, dt: float):
-        """
-        基于当前影子机器人的状态解算 IK 得到关节位置
-        将新的 Root Pose 和解出的关节位置同时写入物理引擎
-        执行 Scene.update(0.0) 触发正向动力学 (FK)
-        计算差分速度
-        """
-        # 1. 解算 IK (基于影子机器人当前那一瞬间的状态)
-        # 此时 self.robot.data 还是上一帧更新后的结果
-        target_q = self.compute_ik(ik_commands) # 内部使用当前的 root_pos_w/quat_w 和 joint_pos
-        
-        # 2. 统一写入目标位姿（Root + Joints）
+        target_q = self.compute_ik(ik_commands)
         root_states = torch.zeros((self.num_envs, 13), device=self.device)
         root_states[:, 0:3] = root_pos_w
         root_states[:, 3:7] = root_quat_w
-        # root_states[:, 7:13] = 0.0 # 影子机器人通常设为 0 速度
         
+        #写入后自动FK
         self.robot.write_root_state_to_sim(root_states)
         self.robot.write_joint_state_to_sim(target_q, torch.zeros_like(target_q))
-        
-        # 3. 核心：执行物理引擎更新，此时会根据新写入的 Root 和 Joint 计算出所有 Body 的 World Pose (FK)
-        self._env.scene.update(0.0)
 
-        # 4. 从更新后的 robot.data 中提取 FK 结果
-        self.joint_pos[:] = self.robot.data.joint_pos
-        self.body_pos_w[:] = self.robot.data.body_pos_w
-        self.body_quat_w[:] = self.robot.data.body_quat_w
-
-        # 5. 差分计算速度 (基于本次 FK 结果和上一帧缓存的 FK 结果)
         if dt > 0:
-            self.joint_vel[:] = (self.joint_pos - self._prev_joint_pos) / dt
-            self.body_lin_vel_w[:] = (self.body_pos_w - self._prev_body_pos_w) / dt
-            # 角速度差分：omega = 2 * (q_curr * q_prev_inv).xyz / dt
-            dq = quat_mul(self.body_quat_w, quat_inv(self._prev_body_quat_w))
-            # 修正：处理四元数双倍覆盖（确保 w 分量为正）
-            sign = torch.sign(dq[..., 0:1])
-            self.body_ang_vel_w[:] = 2.0 * sign * dq[..., 1:4] / dt
+            # 关节空间速度
+            self._joint_vel[:] = (self.joint_pos - self._prev_joint_pos) / dt
+            # 笛卡尔空间线速度
+            self._body_lin_vel_w[:] = (self.body_pos_w - self._prev_body_pos_w) / dt
+            # 笛卡尔空间角速度 (四元数差分)
+            angle_axis = quat_box_minus(self.body_quat_w, self._prev_body_quat_w)
+            self._body_ang_vel_w[:] = angle_axis / dt
+        else:
+            # 如果 dt 为 0，速度清零
+            self._joint_vel.zero_()
+            self._body_lin_vel_w.zero_()
+            self._body_ang_vel_w.zero_()
         
-        # 6. 更新历史缓存
         self._prev_joint_pos[:] = self.joint_pos
         self._prev_body_pos_w[:] = self.body_pos_w
         self._prev_body_quat_w[:] = self.body_quat_w
 
         return target_q
 
-    def sync_history_to_current(self, env_ids: Sequence[int]):
-        """重置时同步历史记录，防止速度差分爆炸"""
-        self._prev_joint_pos[env_ids] = self.joint_pos[env_ids]
-        self._prev_body_pos_w[env_ids] = self.body_pos_w[env_ids]
-        self._prev_body_quat_w[env_ids] = self.body_quat_w[env_ids]
-
     def reset_ghost_robot(self, env_ids: Sequence[int], root_pos_w: torch.Tensor, root_quat_w: torch.Tensor, joint_pos: torch.Tensor):
-        """专门用于重置环境时，强制设置影子机器人的状态，不涉及 IK 解算"""
-        # 1. 写入物理引擎
-        root_states = self.robot.data.root_state_w[env_ids].clone()
+        root_states = torch.zeros_like(self.robot.data.root_state_w[env_ids])
         root_states[:, 0:3] = root_pos_w
         root_states[:, 3:7] = root_quat_w
-        root_states[:, 7:13] = 0.0 # 重置时速度归零
         
         self.robot.write_root_state_to_sim(root_states, env_ids=env_ids)
         self.robot.write_joint_state_to_sim(joint_pos, torch.zeros_like(joint_pos), env_ids=env_ids)
         
-        # 2. 强制该环境的 FK 缓存立即更新 (这一步可选，因为稍后全局 update 也会跑)
-        # 但为了保证 prev_pos 准确，我们需要更新内存中的缓存
-        self.joint_pos[env_ids] = joint_pos
-        self.body_pos_w[env_ids] = root_pos_w.unsqueeze(1) # 这是一个近似，真实的需等全局 update 的 FK
-        self.body_quat_w[env_ids] = root_quat_w.unsqueeze(1)
-        
-        # 3. 同步历史，确保第一帧 dt 计算出的速度为 0
         self._prev_joint_pos[env_ids] = self.joint_pos[env_ids]
         self._prev_body_pos_w[env_ids] = self.body_pos_w[env_ids]
         self._prev_body_quat_w[env_ids] = self.body_quat_w[env_ids]
+        self._joint_vel[env_ids] = torch.zeros_like(self._joint_vel[env_ids])
+        self._body_lin_vel_w[env_ids] = torch.zeros_like(self._body_lin_vel_w[env_ids])
+        self._body_ang_vel_w[env_ids] = torch.zeros_like(self._body_ang_vel_w[env_ids])
 
     @property
     def command(self) -> torch.Tensor:
@@ -1543,6 +1534,7 @@ motion数据结构张量 ✅
 IK更新函数 每次update_command时判断是否需要达到最大time_step_totals ，没有的选下一帧key然后进行IK计算 ✅
 在num_epochs内进行_adaptive_sampling ✅
 body_linv和body_angv可以通过差分计算 ✅
+效率优化 ✅：完全的ghost robot的数据读取
 """
 
 
@@ -1769,14 +1761,17 @@ class MotionGenerator(CommandTerm):
             self._cmd_vel[type_env_ids] = cmd_vel
             
             # 调用插值器
+            max_buf = self.interpolator_root_pose_w.shape[1]
             interpolator:MocapInterpolator = self.interpolator_map[t_type_item]
-            root_pose, target_pose_b = interpolator.interpolate(compact_checkpoints, cmd_vel, self.cfg.fps)
-            
-            # 存入缓冲区
-            num_f = root_pose.shape[1]
-            self.interpolator_root_pose_w[type_env_ids, :num_f] = root_pose
-            self.interpolator_tergets_pose_b[type_env_ids, :num_f] = target_pose_b
-            self.time_step_totals[type_env_ids] = num_f
+            root_pose, target_pose_b, total_frames = interpolator.interpolate(
+                compact_checkpoints, 
+                cmd_vel, 
+                max_buf, 
+                self.cfg.fps
+            )
+            self.interpolator_root_pose_w[type_env_ids] = root_pose
+            self.interpolator_tergets_pose_b[type_env_ids] = target_pose_b
+            self.time_step_totals[type_env_ids] = total_frames
         
         
     def _update_metrics(self):
@@ -1845,7 +1840,10 @@ class MotionGenerator(CommandTerm):
     def _resample_command(self, env_ids: torch.Tensor):
         # 1. 轨迹重新插值与自适应采样 (保持原有逻辑)
         self._compute_interpolation(env_ids)
-        self._adaptive_sampling(env_ids)
+        if not self.cfg.is_play_mode:
+            self._adaptive_sampling(env_ids)
+        else:
+            self.time_steps[env_ids] = 0.0
         # 2. 获取采样时间步对应的目标参考数据
         ee_targets_b = self.interpolator_tergets_pose_b[torch.arange(self.num_envs, device=self.device), self.time_steps]
         # 接下来进行 IK 解算
@@ -1984,6 +1982,8 @@ class MotionGeneratorCfg(CommandTermCfg):
     asset_name: str = MISSING # robot
     
     fps: int = MISSING #重要
+    
+    is_play_mode :bool = False
     
     terrain_and_checkpoint_file: dict[str, list[str]] = MISSING # [地形名, 检查点npz文件] 
     terrain_and_cmd_vel: dict[str, list[tuple[float, float]]] = MISSING # [地形名, 速度范围] (vx, vy, wz)
