@@ -98,6 +98,7 @@ class UnitreeGo2WMultiMotionEnvCfg(MultiMotionEnvCfg):
         self.scene.terrain.terrain_type = "generator"
         self.scene.terrain.terrain_generator = CONFIRM_TERRAIN_CFG2
         self.scene.terrain.debug_vis = False
+        self.scene.terrain.checkpoint_debug_vis = False
         # ------------------------------commands------------------------------
         high_platform_path = os.path.join(go2w_vtm.GO2W_MJCF_DIR, "multi_motion_platform_terrain_k.npz")
         self.commands.motion.anchor_body_name = "base"
@@ -112,7 +113,7 @@ class UnitreeGo2WMultiMotionEnvCfg(MultiMotionEnvCfg):
             "RR_foot": ["RR_hip_joint", "RR_thigh_joint", "RR_calf_joint"],
         }
         self.commands.motion.ik_cfg.debug_vis = False
-        self.commands.motion.ik_cfg.robot_vis = False
+        self.commands.motion.ik_cfg.robot_vis = True
         self.commands.motion.debug_vis = True
         self.commands.motion.motion_max_episode = 15
         # ------------------------------Observations------------------------------
@@ -144,9 +145,12 @@ class UnitreeGo2WMultiMotionEnvCfg(MultiMotionEnvCfg):
         self.events.randomize_com_positions.params["asset_cfg"].body_names = [self.base_link_name]
         # ------------------------------Rewards------------------------------
         self.rewards.action_rate_l2.weight = -1e-2
-        self.rewards.motion_body_pos.weight = 1.0
-        self.rewards.motion_body_lin_vel.weight = 1.0
-        self.rewards.motion_global_anchor_pos.weight = 1.0
+        self.rewards.joint_limit.weight = -1.0
+        # self.rewards.motion_body_pos.weight = 1.0
+        # self.rewards.motion_body_lin_vel.weight = 1.0
+        # self.rewards.motion_global_anchor_pos.weight = 1.0
+        # self.rewards.motion_global_anchor_ori.weight = 0.8
+        
 
         # 取消轮子body的姿态和角速度rew
         self.rewards.motion_body_pos.params["body_names"] = self.body_names

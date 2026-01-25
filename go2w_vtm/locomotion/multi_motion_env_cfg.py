@@ -295,6 +295,7 @@ class RewardsCfg:
         weight=-10.0,
         params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*"])},
     )
+    is_alive = RewTerm(func=mdp.is_alive, weight=0.5)
     # undesired_contacts = RewTerm(
     #     func=mdp.undesired_contacts,
     #     weight=-0.1,
@@ -317,7 +318,7 @@ class TerminationsCfg:
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
     anchor_pos = DoneTerm(
         func=mdp.mul_bad_anchor_pos,
-        params={"command_name": "motion", "threshold": 0.2},
+        params={"command_name": "motion", "threshold": 0.3},
     )
     anchor_ori = DoneTerm(
         func=mdp.mul_bad_anchor_ori,
