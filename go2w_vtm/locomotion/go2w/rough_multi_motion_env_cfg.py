@@ -97,6 +97,7 @@ class UnitreeGo2WMultiMotionEnvCfg(MultiMotionEnvCfg):
         # ------------------------------Terrain------------------------------
         self.scene.terrain.terrain_type = "generator"
         self.scene.terrain.terrain_generator = CONFIRM_TERRAIN_CFG2
+        self.scene.terrain.debug_vis = False
         # ------------------------------commands------------------------------
         high_platform_path = os.path.join(go2w_vtm.GO2W_MJCF_DIR, "multi_motion_platform_terrain_k.npz")
         self.commands.motion.anchor_body_name = "base"
