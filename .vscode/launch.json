@@ -356,8 +356,8 @@
                 "--task",
                 "Rough-Multi-Motion-Unitree-Go2W",
                 "--num_envs",
-                "1000",
-                "--headless",
+                "40",
+                // "--headless",
             ],
         },
         {

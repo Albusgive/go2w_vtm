@@ -1664,7 +1664,7 @@ class MotionGenerator(CommandTerm):
 
     @property
     def body_pos_w(self) -> torch.Tensor:
-        return self.ik_cmd.body_pos_w[:, self.body_indexes]+ self._env.scene.env_origins[:, None, :]
+        return self.ik_cmd.body_pos_w[:, self.body_indexes]
 
     @property
     def body_quat_w(self) -> torch.Tensor:
@@ -1680,7 +1680,7 @@ class MotionGenerator(CommandTerm):
 
     @property
     def anchor_pos_w(self) -> torch.Tensor:
-        return self.ik_cmd.body_pos_w[:, self.motion_anchor_body_index] + self._env.scene.env_origins
+        return self.ik_cmd.body_pos_w[:, self.motion_anchor_body_index]
 
     @property
     def anchor_quat_w(self) -> torch.Tensor:
