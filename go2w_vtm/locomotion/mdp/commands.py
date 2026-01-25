@@ -1299,16 +1299,17 @@ class IKCommand(CommandTerm):
         测试:可以在_resample_command和_update_command实现
     '''
     def __init__(self, cfg: IKCommandCfg, env: ManagerBasedRLEnv):
-        # 1. 初始化基础属性
         self.robot: Articulation = env.scene[cfg.asset_name]
         self.body_names = list(cfg.legs_config.keys())
         self.num_legs = len(self.body_names)
         self.is_pose_mode = cfg.use_pose_mode
         
-        # 2. 调用基类
         super().__init__(cfg, env)
+        
+        if not cfg.robot_vis:
+            env_ids = torch.arange(self.num_envs, device=self.device)
+            self.robot.set_visibility(False,env_ids)
 
-        # 3. 解析索引
         self.cmd_type = "pose" if self.is_pose_mode else "position"
         self.joint_ids_list = []
         self.body_ids_list = []
@@ -1325,8 +1326,6 @@ class IKCommand(CommandTerm):
                 self.jacobi_joint_ids_list.append(leg_entity_cfg.joint_ids)
             else:
                 self.jacobi_joint_ids_list.append([idx + 6 for idx in leg_entity_cfg.joint_ids])
-
-        # 4. 控制器配置
         total_ik_envs = self.num_envs * self.num_legs
         diff_ik_cfg = DifferentialIKControllerCfg(
             command_type=self.cmd_type,
@@ -1336,17 +1335,16 @@ class IKCommand(CommandTerm):
         )
         self.diff_ik_controller = DifferentialIKController(diff_ik_cfg, num_envs=total_ik_envs, device=self.device)
         
-        # 历史记录 (用于下一帧差分)
+        # history for velocity calculation
         self._prev_joint_pos = torch.zeros_like(self.robot.data.joint_pos)
         self._prev_body_pos_w = torch.zeros_like(self.robot.data.body_pos_w)
         self._prev_body_quat_w = torch.zeros_like(self.robot.data.body_quat_w)
-
-        # 差分结果存储 (供 property 读取)
+        # velocity caches
         self._joint_vel = torch.zeros_like(self._prev_joint_pos)
         self._body_lin_vel_w = torch.zeros_like(self._prev_body_pos_w)
         self._body_ang_vel_w = torch.zeros_like(self._prev_body_pos_w)
 
-        # IK 命令
+        # IK command buffer
         self.command_len = 7 if self.is_pose_mode else 3
         self.ik_command = torch.zeros((self.num_envs, self.num_legs, self.command_len), device=self.device)
     
@@ -1505,19 +1503,12 @@ class IKCommand(CommandTerm):
     def _debug_vis_callback(self, event):
         if not self.robot.is_initialized:
             return
-        """可视化直接读取 compute_ik 记录的位姿数据。"""
         for i in range(self.num_legs):
-            # 1. 计算目标点（Goal）的世界坐标
             goal_pos_b = self.ik_command[:, i, 0:3]
             goal_quat_b = self.ik_command[:, i, 3:7] if self.is_pose_mode else torch.tensor([1.0, 0.0, 0.0, 0.0], device=self.device).repeat(self.num_envs, 1)
-            
             g_p_w, g_q_w = combine_frame_transforms(self.robot.data.root_pos_w, self.robot.data.root_quat_w, goal_pos_b, goal_quat_b)
-            
-            # 2. 获取当前末端（Current）的世界位姿
             ee_p_w = self.robot.data.body_state_w[:, self.body_ids_list[i], 0:3]
             ee_q_w = self.robot.data.body_state_w[:, self.body_ids_list[i], 3:7]
-            
-            # 3. 更新可视化
             self.markers[i]["cur"].visualize(ee_p_w, ee_q_w)
             self.markers[i]["goal"].visualize(g_p_w, g_q_w)
 
@@ -1530,6 +1521,8 @@ class IKCommandCfg(CommandTermCfg):
     legs_config: dict[str, list[str]] = MISSING 
     use_pose_mode: bool = False
     vis_scale: float = 0.1
+    
+    robot_vis = True
     
 
 """" 动作生成
@@ -1941,10 +1934,45 @@ class MotionGenerator(CommandTerm):
         self.body_pos_relative_w[:] = target_pos_w[:, None, :] + quat_apply(target_yaw_quat_expanded, rel_pos)
 
     def _set_debug_vis_impl(self, debug_vis: bool):
-        pass
+        if debug_vis:
+            if not hasattr(self, "goal_vel_visualizer"):
+                self.goal_vel_visualizer = VisualizationMarkers(self.cfg.goal_vel_visualizer_cfg)
+                self.current_vel_visualizer = VisualizationMarkers(self.cfg.current_vel_visualizer_cfg)
+            self.goal_vel_visualizer.set_visibility(True)
+            self.current_vel_visualizer.set_visibility(True)
+        else:
+            if hasattr(self, "goal_vel_visualizer"):
+                self.goal_vel_visualizer.set_visibility(False)
+                self.current_vel_visualizer.set_visibility(False)
 
     def _debug_vis_callback(self, event):
-        pass
+        if not self.robot.is_initialized:
+            return
+        anchor_pos_w = self.robot_anchor_pos_w.clone()
+        anchor_pos_w[:, 2] += 0.5
+        vel_des_arrow_scale, vel_des_arrow_quat = self._resolve_xy_velocity_to_arrow(self.velocity_command[:, :2])
+        robot_anchor_lin_vel_b = quat_apply_inverse(self.robot_anchor_quat_w, self.robot_anchor_lin_vel_w)
+        vel_arrow_scale, vel_arrow_quat = self._resolve_xy_velocity_to_arrow(robot_anchor_lin_vel_b[:, :2])
+        self.goal_vel_visualizer.visualize(anchor_pos_w, vel_des_arrow_quat, vel_des_arrow_scale)
+        self.current_vel_visualizer.visualize(anchor_pos_w, vel_arrow_quat, vel_arrow_scale)
+    
+    
+    def _resolve_xy_velocity_to_arrow(self, xy_velocity: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """Converts the XY base velocity command to arrow direction rotation."""
+        # obtain default scale of the marker
+        default_scale = self.goal_vel_visualizer.cfg.markers["arrow"].scale
+        # arrow-scale
+        arrow_scale = torch.tensor(default_scale, device=self.device).repeat(xy_velocity.shape[0], 1)
+        arrow_scale[:, 0] *= torch.linalg.norm(xy_velocity, dim=1) * 3.0
+        # arrow-direction
+        heading_angle = torch.atan2(xy_velocity[:, 1], xy_velocity[:, 0])
+        zeros = torch.zeros_like(heading_angle)
+        arrow_quat = math_utils.quat_from_euler_xyz(zeros, zeros, heading_angle)
+        # convert everything back from base to world frame
+        base_quat_w = self.robot.data.root_quat_w
+        arrow_quat = math_utils.quat_mul(base_quat_w, arrow_quat)
+
+        return arrow_scale, arrow_quat
             
 
     def preprocess_checkpoint_data(self):
@@ -2023,3 +2051,18 @@ class MotionGeneratorCfg(CommandTermCfg):
     adaptive_lambda: float = 0.8
     adaptive_uniform_ratio: float = 0.1
     adaptive_alpha: float = 0.001
+
+
+    goal_vel_visualizer_cfg: VisualizationMarkersCfg = GREEN_ARROW_X_MARKER_CFG.replace(
+        prim_path="/Visuals/Command/velocity_goal"
+    )
+    """The configuration for the goal velocity visualization marker. Defaults to GREEN_ARROW_X_MARKER_CFG."""
+
+    current_vel_visualizer_cfg: VisualizationMarkersCfg = BLUE_ARROW_X_MARKER_CFG.replace(
+        prim_path="/Visuals/Command/velocity_current"
+    )
+    """The configuration for the current velocity visualization marker. Defaults to BLUE_ARROW_X_MARKER_CFG."""
+
+    # Set the scale of the visualization markers to (0.5, 0.5, 0.5)
+    goal_vel_visualizer_cfg.markers["arrow"].scale = (0.5, 0.5, 0.5)
+    current_vel_visualizer_cfg.markers["arrow"].scale = (0.5, 0.5, 0.5)

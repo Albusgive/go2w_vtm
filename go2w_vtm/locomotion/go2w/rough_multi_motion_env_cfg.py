@@ -9,7 +9,7 @@ from ..multi_motion_env_cfg import RewardsCfg
 
 import go2w_vtm
 from go2w_vtm.Robot.go2w import UNITREE_GO2W_CFG,UNITREE_GO2W_NO_MOTOR_LIMIT_CFG,UNITREE_GO2W_GHOST_CFG
-from go2w_vtm.terrains.config.rough import MIMIC_GYM_TERRAIN_CFG,CONFIRM_TERRAIN_CFG,CONFIRM_TERRAIN_CFG2
+from go2w_vtm.terrains.config.rough import CONFIRM_TERRAIN_CFG2
 
 from isaaclab.utils.noise import UniformNoiseCfg
 import os
@@ -92,7 +92,7 @@ class UnitreeGo2WMultiMotionEnvCfg(MultiMotionEnvCfg):
         super().__post_init__()
 
         # ------------------------------Sence------------------------------
-        self.scene.robot = UNITREE_GO2W_NO_MOTOR_LIMIT_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+        self.scene.robot = UNITREE_GO2W_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
         self.scene.ghost_robot = UNITREE_GO2W_GHOST_CFG.replace(prim_path="{ENV_REGEX_NS}/GhostRobot")
         # ------------------------------Terrain------------------------------
         self.scene.terrain.terrain_type = "generator"
@@ -110,7 +110,9 @@ class UnitreeGo2WMultiMotionEnvCfg(MultiMotionEnvCfg):
             "RL_foot": ["RL_hip_joint", "RL_thigh_joint", "RL_calf_joint"],
             "RR_foot": ["RR_hip_joint", "RR_thigh_joint", "RR_calf_joint"],
         }
-        self.commands.motion.ik_cfg.debug_vis = True
+        self.commands.motion.ik_cfg.debug_vis = False
+        self.commands.motion.ik_cfg.robot_vis = False
+        self.commands.motion.debug_vis = True
         self.commands.motion.motion_max_episode = 15
         # ------------------------------Observations------------------------------
         self.observations.policy.joint_pos.func = mdp.joint_pos_rel
@@ -150,7 +152,10 @@ class UnitreeGo2WMultiMotionEnvCfg(MultiMotionEnvCfg):
         self.rewards.motion_body_ori.params["body_names"] = self.body_names[:-4]
         self.rewards.motion_body_lin_vel.params["body_names"] = self.body_names
         self.rewards.motion_body_ang_vel.params["body_names"] = self.body_names[:-4]
-        
+
+        self.rewards.joint_limit.params["asset_cfg"] = SceneEntityCfg(
+            "robot", joint_names=self.leg_joint_names
+        )
         # ------------------------------Termination------------------------------
         # self.terminations.anchor_pos = None
         # self.terminations.anchor_ori = None
