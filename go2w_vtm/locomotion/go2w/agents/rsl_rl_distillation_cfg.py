@@ -34,17 +34,18 @@ class UnitreeGo2WRoughMultiDistillCNNCfg(RslRlDistillationRunnerCfg):
         
         # CNN 参数
         student_cnn_cfg = {
-        "policy_image": {
-        "output_channels": [32, 64, 128],  # ← 目标输出维度 = 最后通道数
-        "kernel_size": [3, 3, 3],
-        "stride": [1, 1, 1],          # 保持空间尺寸（无需下采样）
-        "padding": "zeros",           # ✅ CNN 类支持的字符串（非 "same"！）
-        "norm": "batch",
-        "activation": "elu",
-        "global_pool": "avg",         # ← AdaptiveAvgPool2d(1,1) 压缩任意尺寸
-        "flatten": True,              # 输出 = 128
-    }
-    },
+            "policy_image": {
+                "output_channels": [32, 64, 128],
+                "kernel_size": [3, 3, 3],
+                "stride": [2, 1, 1],          # <-- 仅在第一层用 stride 2，将尺寸降为 9x16
+                "padding": "zeros", 
+                "norm": "batch",
+                "activation": "elu",
+                "max_pool": [False, False, False], 
+                "global_pool": "avg",         # 强制将最后的 9x16 压扁成 1x1
+                "flatten": True,              # 最终输出 128 维向量
+            }
+        },
         teacher_cnn_cfg=None, # 纯 MLP Teacher
     )
     

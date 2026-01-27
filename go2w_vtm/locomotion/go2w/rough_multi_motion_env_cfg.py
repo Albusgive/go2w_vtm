@@ -87,6 +87,8 @@ class UnitreeGo2WMultiMotionEnvCfg(MultiMotionEnvCfg):
         # ------------------------------Sence------------------------------
         self.scene.robot = UNITREE_GO2W_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
         self.scene.ghost_robot = UNITREE_GO2W_GHOST_CFG.replace(prim_path="{ENV_REGEX_NS}/GhostRobot")
+        if not self.is_distillation_env:
+            self.scene.ray_caster_camera = None
         # ------------------------------Terrain------------------------------
         self.scene.terrain.terrain_type = "generator"
         self.scene.terrain.terrain_generator = CONFIRM_TERRAIN_CFG2
