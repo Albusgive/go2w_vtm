@@ -4,8 +4,7 @@ from isaaclab.utils import configclass
 
 import go2w_vtm.locomotion.mdp as mdp
 
-from ..multi_motion_env_cfg import ActionsCfg, MultiMotionEnvCfg, MySceneCfg
-from ..multi_motion_env_cfg import RewardsCfg
+from ..multi_motion_env_cfg import ActionsCfg, MultiMotionEnvCfg, ObservationsCfg
 
 import go2w_vtm
 from go2w_vtm.Robot.go2w import UNITREE_GO2W_CFG,UNITREE_GO2W_NO_MOTOR_LIMIT_CFG,UNITREE_GO2W_GHOST_CFG
@@ -26,28 +25,20 @@ class UnitreeGo2WActionsCfg(ActionsCfg):
         asset_name="robot", joint_names=[""], scale=5.0, use_default_offset=True, clip=None, preserve_order=True
     )
 
+@configclass
+class MultiMotionObservationCfg(ObservationsCfg):
+    policy: ObservationsCfg.PolicyCfg = ObservationsCfg.PolicyCfg()
+    critic: ObservationsCfg.PrivilegedCfg = ObservationsCfg.PrivilegedCfg()
 
 @configclass
-class UnitreeGo2WRewardsCfg(RewardsCfg):
-    """Reward terms for the MDP."""
-
-    joint_vel_wheel_l2 = RewTerm(
-        func=mdp.joint_vel_l2, weight=0.0, params={"asset_cfg": SceneEntityCfg("robot", joint_names="")}
-    )
-
-    joint_acc_wheel_l2 = RewTerm(
-        func=mdp.joint_acc_l2, weight=0.0, params={"asset_cfg": SceneEntityCfg("robot", joint_names="")}
-    )
-
-    joint_torques_wheel_l2 = RewTerm(
-        func=mdp.joint_torques_l2, weight=0.0, params={"asset_cfg": SceneEntityCfg("robot", joint_names="")}
-    )
-
+class MultiMotionDistillObservationCfg(ObservationsCfg):
+    teacher: ObservationsCfg.PolicyCfg = ObservationsCfg.PolicyCfg()
+    policy_normal: ObservationsCfg.PolicyNormalCfg = ObservationsCfg.PolicyNormalCfg()
+    policy_image: ObservationsCfg.PolicyImageCfg = ObservationsCfg.PolicyImageCfg()
 
 @configclass
 class UnitreeGo2WMultiMotionEnvCfg(MultiMotionEnvCfg):
     actions: UnitreeGo2WActionsCfg = UnitreeGo2WActionsCfg()
-    # rewards: UnitreeGo2WRewardsCfg = UnitreeGo2WRewardsCfg()
 
     base_link_name = "base"
     foot_link_name = ".*_foot"
@@ -86,6 +77,8 @@ class UnitreeGo2WMultiMotionEnvCfg(MultiMotionEnvCfg):
     
     min_camera_distance = 0.3
     max_camera_distance = 1.0
+    
+    is_distillation_env: bool = False
 
     def __post_init__(self):
         # post init of parent
@@ -117,20 +110,33 @@ class UnitreeGo2WMultiMotionEnvCfg(MultiMotionEnvCfg):
         self.commands.motion.debug_vis = True
         self.commands.motion.motion_max_episode = 15
         # ------------------------------Observations------------------------------
-        self.observations.policy.joint_pos.func = mdp.joint_pos_rel
-        self.observations.policy.joint_pos.params["asset_cfg"] = SceneEntityCfg(
-            "robot", joint_names=self.leg_joint_names
-        )
-        self.observations.critic.joint_pos.func = mdp.joint_pos_rel
-        self.observations.critic.joint_pos.params["asset_cfg"] = SceneEntityCfg(
-            "robot", joint_names=self.leg_joint_names
-        )
-        self.observations.policy.base_lin_vel = None
-        # self.observations.policy.base_ang_vel.scale = 0.25
-        # self.observations.policy.joint_pos.scale = 1.0
-        # self.observations.policy.joint_vel.scale = 0.05
+        if not self.is_distillation_env:
+            self.observations = MultiMotionObservationCfg()
+            self.observations.policy.joint_pos.func = mdp.joint_pos_rel
+            self.observations.policy.joint_pos.params["asset_cfg"] = SceneEntityCfg(
+                "robot", joint_names=self.leg_joint_names
+            )
+            self.observations.critic.joint_pos.func = mdp.joint_pos_rel
+            self.observations.critic.joint_pos.params["asset_cfg"] = SceneEntityCfg(
+                "robot", joint_names=self.leg_joint_names
+            )
+            # self.observations.policy.base_lin_vel = None
+            # self.observations.policy.base_ang_vel.scale = 0.25
+            # self.observations.policy.joint_pos.scale = 1.0
+            # self.observations.policy.joint_vel.scale = 0.05
 
-        # self.observations.policy.base_lin_vel = None
+            # self.observations.policy.base_lin_vel = None
+        else:
+            self.observations = MultiMotionDistillObservationCfg()
+            self.observations.teacher.joint_pos.func = mdp.joint_pos_rel
+            self.observations.teacher.joint_pos.params["asset_cfg"] = SceneEntityCfg(
+                "robot", joint_names=self.leg_joint_names
+            )
+            self.observations.policy_normal.joint_pos.func = mdp.joint_pos_rel
+            self.observations.policy_normal.joint_pos.params["asset_cfg"] = SceneEntityCfg(
+                "robot", joint_names=self.leg_joint_names
+            )
+            
         # ------------------------------Actions------------------------------
         # reduce action scale
         self.actions.joint_pos.scale = {".*_hip_joint": 0.125, "^(?!.*_hip_joint).*": 0.25}
@@ -169,4 +175,22 @@ class UnitreeGo2WMultiMotionEnvCfg(MultiMotionEnvCfg):
         if self.__class__.__name__ == "UnitreeGo2WMultiMotionEnvCfg":
             self.disable_zero_weight_rewards()
     
+
+@configclass
+class ZeroRewardsCfg:
+    zero = RewTerm(
+        func=mdp.zero_reward,
+        weight=1.0,
+    )
     
+@configclass
+class UnitreeGo2WMultiMotionEnvDistillCfg(UnitreeGo2WMultiMotionEnvCfg):
+    def __post_init__(self):
+        self.is_distillation_env = True
+        super().__post_init__()
+        
+        self.observations.policy = None
+        self.observations.critic = None
+        
+        self.rewards: ZeroRewardsCfg = ZeroRewardsCfg()
+        

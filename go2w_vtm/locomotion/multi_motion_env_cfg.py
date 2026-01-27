@@ -87,7 +87,17 @@ class MySceneCfg(InteractiveSceneCfg):
         prim_path="/World/light",
         spawn=sim_utils.DistantLightCfg(color=(0.75, 0.75, 0.75), intensity=3000.0),
     )
-    
+    ray_caster_camera = RayCasterCameraCfg(
+        prim_path="{ENV_REGEX_NS}/Robot/base",
+        offset=RayCasterCameraCfg.OffsetCfg(pos=(0.4, 0.0, 0.03), convention="world"),
+        ray_alignment='yaw',
+        pattern_cfg=patterns.PinholeCameraPatternCfg(width=32, height=18, focal_length=11.41,
+                                                     horizontal_aperture=2 * math.tan(math.radians(89.51) / 2),
+                                                     vertical_aperture=2 * math.tan(math.radians(58.29) / 2)),
+        debug_vis=False,
+        mesh_prim_paths=["/World/ground"],
+        data_types=["distance_to_camera"],
+    )
     
     
 
@@ -147,7 +157,7 @@ class ObservationsCfg:
         motion_anchor_ori_b = ObsTerm(
             func=mdp.mul_motion_anchor_ori_b, params={"command_name": "motion"}, noise=Unoise(n_min=-0.05, n_max=0.05)
         )
-        base_lin_vel = ObsTerm(func=mdp.base_lin_vel, noise=Unoise(n_min=-0.5, n_max=0.5))
+        # base_lin_vel = ObsTerm(func=mdp.base_lin_vel, noise=Unoise(n_min=-0.5, n_max=0.5))
         base_ang_vel = ObsTerm(func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2))
         joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
         joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.5, n_max=0.5))
@@ -170,10 +180,38 @@ class ObservationsCfg:
         joint_pos = ObsTerm(func=mdp.joint_pos_rel)
         joint_vel = ObsTerm(func=mdp.joint_vel_rel)
         actions = ObsTerm(func=mdp.last_action)
+        
+    @configclass
+    class PolicyNormalCfg(ObsGroup):
+        projected_gravity = ObsTerm(
+            func=mdp.projected_gravity,
+            clip=(-100.0, 100.0),
+            scale=5.0,
+            history_length=1,
+        )
+        velocity_command = ObsTerm(func=mdp.mul_motion_velocity_command, params={"command_name": "motion"})
+        joint_pos = ObsTerm(func=mdp.joint_pos_rel)
+        joint_vel = ObsTerm(func=mdp.joint_vel_rel)
+        actions = ObsTerm(func=mdp.last_action)
+        
+    @configclass
+    class PolicyImageCfg(ObsGroup):
+        ray_caster_camera = ObsTerm(
+            func=mdp.image_bchw,
+            params={"sensor_cfg": SceneEntityCfg("ray_caster_camera"), "data_type": "distance_to_camera",
+                    "depth_clip": (0.1, 5.0)
+                    },
+            flatten_history_dim=False,
+        )
 
     # observation groups
-    policy: PolicyCfg = PolicyCfg()
-    critic: PrivilegedCfg = PrivilegedCfg()
+    # policy: PolicyCfg = PolicyCfg()
+    # critic: PrivilegedCfg = PrivilegedCfg()
+    
+    # teacher_student
+    # teacher: PolicyCfg = PolicyCfg()
+    # policy_normal: PolicyNormalCfg = PolicyNormalCfg()
+    # policy_image: PolicyImageCfg = PolicyImageCfg()
 
 
 @configclass

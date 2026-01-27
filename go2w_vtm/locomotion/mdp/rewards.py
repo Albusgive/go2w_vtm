@@ -1197,3 +1197,8 @@ def feet_contact_time(env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg, thresh
     last_contact_time = contact_sensor.data.last_contact_time[:, sensor_cfg.body_ids]
     reward = torch.sum((last_contact_time < threshold) * first_air, dim=-1)
     return reward
+
+
+#zero_reward
+def zero_reward(env: ManagerBasedRLEnv) -> torch.Tensor:
+    return torch.zeros(env.num_envs, device=env.device)
