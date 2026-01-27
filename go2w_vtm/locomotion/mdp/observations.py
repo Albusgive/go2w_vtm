@@ -170,6 +170,57 @@ def image_max(
     return images
 
 
+def image_bchw(
+    env: ManagerBasedEnv,
+    sensor_cfg: SceneEntityCfg = SceneEntityCfg("tiled_camera"),
+    data_type: str = "rgb",
+    convert_perspective_to_orthogonal: bool = False,
+    normalize: bool = True,
+    depth_clip: tuple[float, float] = (0.0, 5.0),  # (min_depth, max_depth) in meters
+) -> torch.Tensor:
+    # extract the used quantities (to enable type-hinting)
+    sensor: TiledCamera | Camera | RayCasterCamera = env.scene.sensors[sensor_cfg.name]
+
+    # obtain the input image: shape (N, H, W, C) from RayCasterCamera
+    images = sensor.data.output[data_type].clone()  # 避免修改原始数据
+
+    # =============== 深度图像预处理（在归一化前） ===============
+    is_depth = "distance_to" in data_type or "depth" in data_type.lower()
+    
+    # 透视深度转正交（仅适用于 distance_to_camera）
+    if is_depth and data_type == "distance_to_camera" and convert_perspective_to_orthogonal:
+        images = math_utils.orthogonalize_perspective_depth(images, sensor.data.intrinsic_matrices)
+    
+    # 【关键新增】深度图像裁剪：在归一化逻辑前执行
+    if is_depth and normalize:
+        # Step 1: 处理无效值（RayCaster 返回 inf 表示无命中）
+        images[torch.isinf(images)] = 0.0  # 与原逻辑一致：无效点置0
+        
+        # Step 2: 【新增】硬裁剪到有效范围（防止异常值干扰归一化）
+        images = torch.clamp(images, min=depth_clip[0], max=depth_clip[1])
+        
+        # Step 3: 归一化到 [0, 1]（使用裁剪后的范围）
+        depth_range = depth_clip[1] - depth_clip[0] + 1e-8  # 防除零
+        images = (images - depth_clip[0]) / depth_range
+    
+    # =============== 其他数据类型归一化 ===============
+    elif normalize:
+        if data_type == "rgb":
+            images = images.float() / 255.0
+            # 减均值（保持原逻辑，用于简单白化）
+            mean_tensor = torch.mean(images, dim=(1, 2), keepdim=True)
+            images -= mean_tensor
+        elif "normals" in data_type.lower():
+            # [-1, 1] -> [0, 1]
+            images = (images + 1.0) * 0.5
+    
+    # =============== 格式转换：(N, H, W, C) -> (B, C, H, W) ===============
+    # permute 保证内存连续性，适配 RSL RL 的 CNN 输入要求
+    images = images.permute(0, 3, 1, 2)  # (batch, channel, height, width)
+    
+    return images.contiguous()
+
+
 def generated_commands_low_then_pos_z(
     env: ManagerBasedRLEnv, 
     command_name: str, 

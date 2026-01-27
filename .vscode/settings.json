@@ -98,6 +98,7 @@
         "/home/albusgive2/IsaacLabNum/IsaacLab-2.3.1/source/isaaclab_mimic",
         "/home/albusgive2/IsaacLabNum/IsaacLab-2.3.1/source/isaaclab",
         "/home/albusgive2/IsaacLabNum/IsaacLab-2.3.1/source/isaaclab_assets",
+        "/home/albusgive2/go2w_vtm/rsl_rl-3.3.0"
     ],
     "cmake.sourceDirectory": "/home/albusgive2/go2w_end2end/go2w_end2end/Robot/go2w_description",
     "ROS2.distro": "humble",

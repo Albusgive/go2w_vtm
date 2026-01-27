@@ -58,7 +58,8 @@ import os
 import time
 import torch
 
-from rsl_rl.runners import DistillationRunner, OnPolicyRunner
+from rsl_rl.runners import OnPolicyRunner
+from go2w_vtm.rsl_rl.runners.distillation_runner import DistillationRunner
 
 from isaaclab.envs import (
     DirectMARLEnv,

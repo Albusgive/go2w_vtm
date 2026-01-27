@@ -56,7 +56,7 @@ import platform
 from packaging import version
 
 # check minimum supported rsl-rl version
-RSL_RL_VERSION = "3.0.1"
+RSL_RL_VERSION = "3.3.0"
 installed_version = metadata.version("rsl-rl-lib")
 if version.parse(installed_version) < version.parse(RSL_RL_VERSION):
     if platform.system() == "Windows":
@@ -78,7 +78,8 @@ import torch
 from datetime import datetime
 
 import omni
-from rsl_rl.runners import DistillationRunner, OnPolicyRunner
+from rsl_rl.runners import OnPolicyRunner
+from go2w_vtm.rsl_rl.runners.distillation_runner import DistillationRunner
 
 from isaaclab.envs import (
     DirectMARLEnv,
@@ -168,9 +169,16 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         env = multi_agent_to_single_agent(env)
 
     # save resume path before creating a new log_dir
-    if agent_cfg.resume or agent_cfg.algorithm.class_name == "Distillation":
+    resume_path = ""
+    if agent_cfg.resume: 
         resume_path = get_checkpoint_path(log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint)
-
+    elif agent_cfg.algorithm.class_name == "Distillation":
+        resume_path = cli_args.get_teacher_checkpoint_path(
+            log_path=os.path.join("logs", "rsl_rl"),
+            run_dir=args_cli.teacher_load_run,
+            checkpoint_spec=args_cli.teacher_checkpoint
+        )
+        
     # wrap for video recording
     if args_cli.video:
         video_kwargs = {
