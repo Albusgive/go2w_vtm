@@ -101,7 +101,7 @@ gym.register(
     disable_env_checker=True,
     kwargs={
         "env_cfg_entry_point": f"{__name__}.rough_multi_motion_env_cfg:UnitreeGo2WMultiMotionEnvDistillCfg",
-        "rsl_rl_distillation_cfg_entry_point": (
+        "rsl_rl_cfg_entry_point": (
             f"{agents.__name__}.rsl_rl_distillation_cfg:UnitreeGo2WRoughMultiDistillCNNCfg"
         ),
     },

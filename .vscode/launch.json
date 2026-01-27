@@ -388,8 +388,6 @@
             "args": [
                 "--task",
                 "Rough-Multi-Motion-Unitree-Go2W-Distill-CNN",
-                "--agent",
-                "rsl_rl_distillation_cfg_entry_point",
                 "--num_envs",
                 "40",
                 "--headless",
@@ -408,8 +406,6 @@
             "args": [
                 "--task",
                 "Rough-Multi-Motion-Unitree-Go2W-Distill-CNN",
-                "--agent",
-                "rsl_rl_distillation_cfg_entry_point",
                 "--num_envs",
                 "40",
                 "--headless",
@@ -418,5 +414,17 @@
             ],
         },
         // torchrun   --nnodes=1   --nproc_per_node=2   go2w_vtm/scripts/train.py   --task Rough-Multi-Motion-Unitree-Go2W   --headless   --distributed   --num_envs 4096
+        /*
+        torchrun \
+        --nnodes=1 \
+        --nproc_per_node=2 \
+        go2w_vtm/scripts/train.py \
+        --task Rough-Multi-Motion-Unitree-Go2W-Distill-CNN \
+        --headless \
+        --distributed \
+        --num_envs 4096 \
+        --teacher_load_run unitree_go2w_rough_multi_motion \
+        --teacher_checkpoint 2026-01-25_22-38-21/model_29500.pt
+        */
     ]
 }
