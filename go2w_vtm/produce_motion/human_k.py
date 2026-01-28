@@ -11,21 +11,19 @@ from go2w_vtm.produce_motion.decode_terrain import DecodeTerrain
 
 # plugin_path = go2w_vtm.GO2W_MJCF_DIR + "/mj_plugin"
 # mujoco.mj_loadAllPluginLibraries(plugin_path)
-is_edit_mode = True
+is_edit_mode = False
 
-file_path = go2w_vtm.GO2W_MJCF_DIR + "/go2w_mocap.xml"
+robot_path = go2w_vtm.GO2W_MJCF_DIR + "/go2w_mocap.xml"
 # multi_motion_trench_terrain multi_motion_platform_terrain
-terrain_name = "multi_motion_platform_terrain"
+terrain_name = "multi_motion_trench_terrain"
 terrain_path = go2w_vtm.GO2W_MJCF_DIR + "/" + terrain_name + ".xml"
-terrain_k_path = go2w_vtm.GO2W_MJCF_DIR + "/" + terrain_name + "_k.xml"
 temp_path = go2w_vtm.GO2W_MJCF_DIR + "/temp.xml"
 
-mjcf = MJCFEditor(file_path)
+mjcf = MJCFEditor(robot_path)
 mjcf.add_sub_element("worldbody", "light", attrib={"pos": "0 0 1.5","dir": "0 0 -1","directional":"true",})
 mjcf.add_sub_element("worldbody", "light", attrib={"pos": "-1.5 0 1.5","dir": "1 0 -1","directional":"true",})
 mjcf.add_sub_element("mujoco", "include", attrib={"file": terrain_path})
 
-# mjcf.add_sub_element("mujoco", "include", attrib={"file": terrain_k_path})
 mjcf.save(temp_path)
 
 anchor = ["FL_foot_joint", "FR_foot_joint", "RR_foot_joint", "RL_foot_joint"]

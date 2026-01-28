@@ -96,11 +96,16 @@ class UnitreeGo2WMultiMotionEnvCfg(MultiMotionEnvCfg):
         self.scene.terrain.checkpoint_debug_vis = False
         # ------------------------------commands------------------------------
         high_platform_path = os.path.join(go2w_vtm.GO2W_MJCF_DIR, "multi_motion_platform_terrain_k.npz")
+        trench_path = os.path.join(go2w_vtm.GO2W_MJCF_DIR, "multi_motion_trench_terrain_k.npz")
         self.commands.motion.anchor_body_name = "base"
         self.commands.motion.body_names = self.body_names
         self.commands.motion.joint_names = self.leg_joint_names
-        self.commands.motion.terrain_and_checkpoint_file = {"high_platform": high_platform_path} #TODO
-        self.commands.motion.terrain_and_cmd_vel = {"high_platform": [(0.8,1.0),(0.0,0.0),(0.0,0.0)]}
+        self.commands.motion.terrain_and_checkpoint_file = {"high_platform": high_platform_path,
+                                                            "trench": trench_path
+                                                            }
+        self.commands.motion.terrain_and_cmd_vel = {"high_platform": [(0.7,1.0),(0.0,0.0),(0.0,0.0)],
+                                                    "trench": [(0.7,1.0),(0.0,0.0),(0.0,0.0)]
+                                                    }
         self.commands.motion.ik_cfg.legs_config={
             "FL_foot": ["FL_hip_joint", "FL_thigh_joint", "FL_calf_joint"],
             "FR_foot": ["FR_hip_joint", "FR_thigh_joint", "FR_calf_joint"],
