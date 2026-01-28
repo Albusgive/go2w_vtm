@@ -407,7 +407,15 @@
                 "/home/albusgive2/go2w_vtm/logs/rsl_rl/unitree_go2w_rough_multi_motion_distill_cnn/2026-01-28_03-44-32/model_13900.pt"
             ],
         },
-        // torchrun   --nnodes=1   --nproc_per_node=2   go2w_vtm/scripts/train.py   --task Rough-Multi-Motion-Unitree-Go2W   --headless   --distributed   --num_envs 4096
+        /*  torchrun  \
+            --nnodes=1   \
+            --nproc_per_node=2  \
+            go2w_vtm/scripts/train.py   \
+            --task Rough-Multi-Motion-Unitree-Go2W  \
+            --headless   \
+            --distributed   \
+            --num_envs 4096
+        */
         /*
         torchrun \
         --nnodes=1 \
