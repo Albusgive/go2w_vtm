@@ -34,6 +34,7 @@ parser.add_argument(
     help="Use the pre-trained checkpoint from Nucleus.",
 )
 parser.add_argument("--real-time", action="store_true", default=False, help="Run in real-time, if possible.")
+parser.add_argument("--use_jit_model", action="store_true", default=False, help="Use the exported JIT model for inference.")
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
 # append AppLauncher cli args
@@ -170,8 +171,23 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     # export policy to onnx/jit
     export_model_dir = os.path.join(os.path.dirname(resume_path), "exported")
-    export_policy_as_jit(policy_nn, normalizer=normalizer, path=export_model_dir, filename="policy.pt")
-    export_policy_as_onnx(policy_nn, normalizer=normalizer, path=export_model_dir, filename="policy.onnx")
+    use_jit_model = args_cli.use_jit_model
+    jit_policy = None
+    
+    if type(policy_nn).__name__ == "StudentTeacherCNN":
+        from go2w_vtm.rsl_rl.exporter import export_student_teacher
+        export_student_teacher(policy_nn, path=export_model_dir, filename="student")
+        
+        # 加载刚才导出的模型进行测试演示
+        jit_model_path = os.path.join(export_model_dir, "student.pt")
+        if os.path.exists(jit_model_path):
+            print(f"[INFO] 加载导出的 JIT 模型进行测试推理: {jit_model_path}")
+            jit_policy = torch.jit.load(jit_model_path).to(env.unwrapped.device)
+            use_jit_model = True # 开启切换演示
+    else:
+        # 非 StudentTeacherCNN 逻辑
+        export_policy_as_jit(policy_nn, normalizer=normalizer, path=export_model_dir, filename="policy.pt")
+        export_policy_as_onnx(policy_nn, normalizer=normalizer, path=export_model_dir, filename="policy.onnx")
 
     dt = env.unwrapped.step_dt
 
@@ -184,7 +200,14 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         # run everything in inference mode
         with torch.inference_mode():
             # agent stepping
-            actions = policy(obs)
+            if use_jit_model and jit_policy is not None:
+                obs_1d = obs["policy_normal"]
+                obs_2d_flat = obs["policy_image"].reshape(obs_1d.shape[0], -1)
+                input_flat = torch.cat([obs_1d, obs_2d_flat], dim=-1)
+                actions = jit_policy(input_flat)
+            else:
+                # 使用原始训练框架的 Policy 推理
+                actions = policy(obs)
             # env stepping
             obs, _, _, _ = env.step(actions)
         if args_cli.video:

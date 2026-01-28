@@ -3,6 +3,7 @@ import go2w_vtm
 import mujoco_viewer
 import mujoco.viewer
 import glfw
+import time
 
 import mujoco
 from go2w_vtm.utils.mjcf_editor import MJCFEditor
@@ -10,10 +11,10 @@ from go2w_vtm.produce_motion.decode_terrain import DecodeTerrain
 
 # plugin_path = go2w_vtm.GO2W_MJCF_DIR + "/mj_plugin"
 # mujoco.mj_loadAllPluginLibraries(plugin_path)
-
+is_edit_mode = True
 
 file_path = go2w_vtm.GO2W_MJCF_DIR + "/go2w_mocap.xml"
-# test_box_float_box_terrain  test_box_platform_terrain test_box_rock_fissure_terrain test_box_trench_terrain 
+# multi_motion_trench_terrain multi_motion_platform_terrain
 terrain_name = "multi_motion_platform_terrain"
 terrain_path = go2w_vtm.GO2W_MJCF_DIR + "/" + terrain_name + ".xml"
 terrain_k_path = go2w_vtm.GO2W_MJCF_DIR + "/" + terrain_name + "_k.xml"
@@ -34,19 +35,31 @@ cfg = IK_and_savekey.mink_cfg("base_link",anchor,anchor_ref)
 cfg.orientation_cost = 0.6
 
 plk = IK_and_savekey.PlanningKeyframe(temp_path,cfg,save_key_path=go2w_vtm.GO2W_MJCF_DIR,save_key_name=terrain_name+"_k") # mink
-plk.set_root_targets("base_link",["FL_foot_joint_ref","FR_foot_joint_ref","RL_foot_joint_ref","RR_foot_joint_ref"])
-plk.load_relative_npz(go2w_vtm.GO2W_MJCF_DIR + "/" + terrain_name + "_k.npz")
-# plk.sync_from_model_keys()
+if is_edit_mode:
+    plk.set_root_targets("base_link",["FL_foot_joint_ref","FR_foot_joint_ref","RL_foot_joint_ref","RR_foot_joint_ref"])
+    plk.load_relative_npz(go2w_vtm.GO2W_MJCF_DIR + "/" + terrain_name + "_k.npz")
+    # plk.sync_from_model_keys()
+else:
+    hz = 50
+    plk.load_interpolator_config(go2w_vtm.GO2W_MJCF_DIR + "/" + terrain_name + "_k.npz")
+    plk.compute_and_store_interpolated_frames((1.0,0.0,0.0),hz)
 
-# TODO 调整key 添加key过程状态描述,保存为mjcf并通过name描述key过程状态, key2npz功能增加,check_point_key模式的npz文件 加载给IK_motion_loader
-# 单线程mujoco测试:插值计算(并行通用计算),motion trace randmonize
 with mujoco.viewer.launch_passive(plk.model, plk.data,key_callback=plk.key_callback,
                                   show_left_ui=False,show_right_ui=False) as viewer:
     plk.draw_terrain_key_pos(viewer)
-    plk.create_static_grid(viewer,0.2,1.5,rgba=[0.5,0.5,0.5,0.2],line_thickness=0.005,hide=True)
+    replay_k = 0
+    if is_edit_mode:
+        plk.create_static_grid(viewer,0.2,1.5,rgba=[0.5,0.5,0.5,0.2],line_thickness=0.005,hide=True)
     while viewer.is_running():
+        start_time = time.time()
+        if not is_edit_mode:
+            plk.reset_key(replay_k)
         plk.update()
-        mujoco.mj_forward(plk.model, plk.data)
-
+        if not is_edit_mode:
+            replay_k += 1
+            if replay_k >= plk.nkey:
+                replay_k = 0
+            end_time = time.time()
+            time.sleep(max(0,1.0/hz - (end_time - start_time)))
         viewer.sync()
         

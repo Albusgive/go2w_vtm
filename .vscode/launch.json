@@ -273,14 +273,6 @@
             "args": [],
         },
         {
-            "name": "TEST_HUMAN_KEY_INTER",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "/home/albusgive2/go2w_vtm/go2w_vtm/produce_motion/human_k_interpolator.py",
-            "console": "integratedTerminal",
-            "args": [],
-        },
-        {
             "name": "TEST_Go2W-MIMIC-Rough",
             "type": "debugpy",
             "request": "launch",
@@ -408,9 +400,11 @@
                 "Rough-Multi-Motion-Unitree-Go2W-Distill-CNN",
                 "--num_envs",
                 "40",
-                "--headless",
+                // "--headless",
+                // "--use_jit_model",
+                // "True",
                 "--checkpoint",
-                // "/home/albusgive2/go2w_vtm/logs/rsl_rl/unitree_go2w_rough_multi_motion/2026-01-25_22-38-21/model_29500.pt"
+                "/home/albusgive2/go2w_vtm/logs/rsl_rl/unitree_go2w_rough_multi_motion_distill_cnn/2026-01-28_03-44-32/model_13900.pt"
             ],
         },
         // torchrun   --nnodes=1   --nproc_per_node=2   go2w_vtm/scripts/train.py   --task Rough-Multi-Motion-Unitree-Go2W   --headless   --distributed   --num_envs 4096

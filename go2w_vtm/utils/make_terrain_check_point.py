@@ -36,9 +36,15 @@ def makeBoxTrenchTerrainCheckPoint(
     # 4.到达另一端
     middle_key_pos = np.array([terrain_x_max, size[1]/2, 0])
     terrain_key_pos_list.append(middle_key_pos)
+    descriptions.append("trench other edge")
+    
+    # 5.离开沟壑
+    middle_key_pos = np.array([terrain_x_max + 0.1, size[1]/2, 0])
+    terrain_key_pos_list.append(middle_key_pos)
     descriptions.append("trench end")
     
-    end_key_pos = np.array([terrain_x_max + 0.1, size[1]/2, 0])
+    # 结束位置
+    end_key_pos = np.array([terrain_x_max + (size[0]-terrain_x_max)/2, size[1]/2, 0])
     terrain_key_pos_list.append(end_key_pos)
     descriptions.append("end")
     
@@ -83,16 +89,20 @@ def makeBoxHighPlatformTerrainCheckPoint(
     terrain_key_pos_list.append(middle_key_pos)
     descriptions.append("platform_up_edge leg down")
     
-    # 5.恢复姿态
+    # 5.收一条腿
     middle_key_pos = np.array([terrain_x_min + 0.15, size[1]/2, _platform_height])
+    terrain_key_pos_list.append(middle_key_pos)
+    descriptions.append("platform_up_edge leg*2 down")
+    
+    # 6.恢复姿态 恢复正常站姿
+    middle_key_pos = np.array([terrain_x_min + 0.2, size[1]/2, _platform_height])
     terrain_key_pos_list.append(middle_key_pos)
     descriptions.append("finished up")
 
-    # 6.结束位置
+    # 7.结束位置
     end_key_pos = np.array([terrain_x_min + platform_width/2, size[1]/2, _platform_height])
     terrain_key_pos_list.append(end_key_pos)
     descriptions.append("end")
-
     
     return terrain_key_pos_list,descriptions
 

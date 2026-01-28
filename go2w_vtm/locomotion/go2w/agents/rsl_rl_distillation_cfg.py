@@ -10,7 +10,7 @@ from go2w_vtm.rsl_rl.distillation import RslRlDistillationStudentTeacherCNNCfg
 class UnitreeGo2WRoughMultiDistillCNNCfg(RslRlDistillationRunnerCfg):
     num_steps_per_env = 24
     max_iterations = 20000
-    save_interval = 100
+    save_interval = 500
     experiment_name = "unitree_go2w_rough_multi_motion_distill_cnn"
     empirical_normalization = True # Runner 层面的 norm 通常关掉，由 Policy 内部控制
 
@@ -37,13 +37,13 @@ class UnitreeGo2WRoughMultiDistillCNNCfg(RslRlDistillationRunnerCfg):
             "policy_image": {
                 "output_channels": [32, 64, 128],
                 "kernel_size": [3, 3, 3],
-                "stride": [2, 1, 1],          # <-- 仅在第一层用 stride 2，将尺寸降为 9x16
+                "stride": [2, 1, 1],          
                 "padding": "zeros", 
                 "norm": "batch",
                 "activation": "elu",
                 "max_pool": [False, False, False], 
-                "global_pool": "avg",         # 强制将最后的 9x16 压扁成 1x1
-                "flatten": True,              # 最终输出 128 维向量
+                "global_pool": "avg",         
+                "flatten": True,              
             }
         },
         teacher_cnn_cfg=None, # 纯 MLP Teacher

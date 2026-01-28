@@ -29,7 +29,7 @@ class SaveTerrainCfg(SubTerrainBaseCfg):
     terrain_name: str = MISSING
     
     ''' 机器人x坐标 '''
-    terrain_x: float = MISSING  
+    terrain_x: float = MISSING  #地形距离机器人x坐标的距离
     robot_origin_x: float = 1.5
     
     def make_check_points(self, difficulty: float)->Tuple[List[np.ndarray], List[str]]:

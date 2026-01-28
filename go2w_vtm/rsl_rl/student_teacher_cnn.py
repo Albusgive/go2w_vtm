@@ -42,6 +42,7 @@ class StudentTeacherCNN(nn.Module):
 
         self.loaded_teacher = False
         self.obs_groups = obs_groups
+        self.student_obs_metadata = {g: list(obs[g].shape[1:]) for g in obs_groups["policy"]}
 
         # =================================================================================
         # 1. Setup Student (Policy)

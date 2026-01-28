@@ -14,7 +14,8 @@
     <text name="terrain_key_pos2:platform_edge front leg" data="0.95 0.0 -0.05"/>
     <text name="terrain_key_pos3:platform_up_edge back one leg up" data="1.0 0.0 -0.05"/>
     <text name="terrain_key_pos4:platform_up_edge leg down" data="1.1 0.0 0.3741529057900094"/>
-    <text name="terrain_key_pos5:finished up" data="1.15 0.0 0.3741529057900094"/>
-    <text name="terrain_key_pos6:end" data="1.4999999999999998 0.0 0.3741529057900094"/>
+    <text name="terrain_key_pos5:platform_up_edge leg*2 down" data="1.15 0.0 0.3741529057900094"/>
+    <text name="terrain_key_pos6:finished up" data="1.2 0.0 0.3741529057900094"/>
+    <text name="terrain_key_pos7:end" data="1.4999999999999998 0.0 0.3741529057900094"/>
   </custom>
 </mujoco>

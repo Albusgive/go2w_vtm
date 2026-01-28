@@ -190,9 +190,19 @@ class UnitreeGo2WMultiMotionEnvDistillCfg(UnitreeGo2WMultiMotionEnvCfg):
     def __post_init__(self):
         self.is_distillation_env = True
         super().__post_init__()
+        # ------------------------------Vis------------------------------
+        self.commands.motion.debug_vis = True
+        self.commands.motion.ik_cfg.robot_vis = False
+        self.scene.ray_caster_camera.debug_vis = True
         
+        # ------------------------------Observations------------------------------
         self.observations.policy = None
         self.observations.critic = None
+        # ------------------------------commands------------------------------
+        self.commands.motion.is_play_mode = True
+        # ------------------------------Termination------------------------------
+        self.terminations.anchor_pos = None
+        self.terminations.anchor_ori = None
         
         self.rewards: ZeroRewardsCfg = ZeroRewardsCfg()
         

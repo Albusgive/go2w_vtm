@@ -1,0 +1,20 @@
+<mujoco model="multi_motion_trench_terrain">
+  <asset>
+    <mesh name="multi_motion_trench_terrain_mesh0" file="meshs/multi_motion_trench_terrain_mesh0.stl"/>
+    <mesh name="multi_motion_trench_terrain_mesh1" file="meshs/multi_motion_trench_terrain_mesh1.stl"/>
+  </asset>
+  <worldbody>
+    <geom type="mesh" mesh="multi_motion_trench_terrain_mesh0" rgba="0.8 0.6 0.4 1" pos="-0.8 -1.5 -0.05" contype="1" conaffinity="1" group="1"/>
+    <geom type="mesh" mesh="multi_motion_trench_terrain_mesh1" rgba="0.8 0.6 0.4 1" pos="-0.8 -1.5 -0.05" contype="1" conaffinity="1" group="1"/>
+  </worldbody>
+  <custom>
+    <text name="terrain:multi_motion_trench_terrain" data="difficulty:0.9015143091603045"/>
+    <text name="terrain_key_pos0:init" data="0.0 0.0 -0.05"/>
+    <text name="terrain_key_pos1:trench_edge" data="1.4999999999999998 0.0 -0.05"/>
+    <text name="terrain_key_pos2:trench_edge force" data="1.5999999999999999 0.0 -0.05"/>
+    <text name="terrain_key_pos3:trench_edge force end" data="1.7 0.0 -0.05"/>
+    <text name="terrain_key_pos4:trench other edge" data="1.9803028618320606 0.0 -0.05"/>
+    <text name="terrain_key_pos5:trench end" data="2.0803028618320605 0.0 -0.05"/>
+    <text name="terrain_key_pos6:end" data="3.0901514309160305 0.0 -0.05"/>
+  </custom>
+</mujoco>
