@@ -194,7 +194,7 @@ class UnitreeGo2WMultiMotionEnvDistillCfg(UnitreeGo2WMultiMotionEnvCfg):
         super().__post_init__()
         # ------------------------------Vis------------------------------
         self.commands.motion.debug_vis = True
-        self.commands.motion.ik_cfg.robot_vis = False
+        self.commands.motion.ik_cfg.robot_vis = True
         self.scene.ray_caster_camera.debug_vis = True
         
         # ------------------------------Observations------------------------------
