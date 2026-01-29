@@ -32,17 +32,17 @@ class UnitreeGo2WRoughMultiDistillCNNCfg(RslRlDistillationRunnerCfg):
         
         activation="elu",
         
-        # CNN 参数
+        # CNN 参数 对应obs_groups
         student_cnn_cfg = {
             "policy_image": {
-                "output_channels": [32, 64, 128],
-                "kernel_size": [3, 3, 3],
-                "stride": [2, 1, 1],          
+                "output_channels": [16,32],
+                "kernel_size": [3, 3],
+                "stride": [2, 2],          
                 "padding": "zeros", 
                 "norm": "batch",
                 "activation": "elu",
-                "max_pool": [False, False, False], 
-                "global_pool": "avg",         
+                "max_pool": [False, False], 
+                "global_pool": "avg",  # avg会将output_size降为output_channels最后一个数值         
                 "flatten": True,              
             }
         },
