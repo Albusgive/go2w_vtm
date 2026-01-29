@@ -197,67 +197,23 @@ def create_mujoco_box_mesh(
     return box
 
 
-def fix_box_terrain(difficulty: float, cfg: mimic_gym_terrain_cfg.MimicFixBoxTerrainCfg) -> np.ndarray:
-    """
-    高台只能使用box,如果修改高度场就会出现初始z为最高位置
-    """
-    if len(cfg.high_platform_x) != len(cfg.high_platform_half_width) or len(cfg.high_platform_x) != len(cfg.high_platform_half_width):
-        raise ValueError("high_platform_x, high_platform_width, high_platform_height must have the same length.")
-    
-    # 初始化网格列表
+def fix_box_terrain(difficulty: float, cfg: mimic_gym_terrain_cfg.FixBoxTerrainCfg) -> np.ndarray:
     meshes_list = []
 
-    # --  创建基础地面 --
-    # ground_plane = make_plane_box(cfg.size, height=0.0, center_zero=False)
-    # meshes_list.append(ground_plane)
     
     # -- 定义机器人出生点 --
-    terrain_center = np.array([0.5 * cfg.size[0], 0.5 * cfg.size[1]])
-    origin = np.array([cfg.robot_origin_x, terrain_center[1], 0.05]) # 稍高于平台
-
-    for i in range(len(cfg.high_platform_x)):
-        box_size=[cfg.high_platform_half_width[i],cfg.size[1]/2,cfg.high_platform_half_height[i]]
-        box_center_pos=[cfg.high_platform_x[i],0,cfg.high_platform_z[i]]
+    origin = np.array([0, 0, 0.0]) 
+    # 生成box
+    for i,pos in enumerate(cfg.box_pos):
+        box_size=cfg.box_half_size[i]
+        box_center_pos=pos
         box_mesh = create_mujoco_box_mesh(box_size, box_center_pos, origin)
         meshes_list.append(box_mesh)
-    
-    # save_terrain_as_mjcf_with_stl(cfg=cfg, meshes_list=meshes_list, origin=origin, difficulty=difficulty)
-
+    meshes_list.append(make_plane(cfg.size, 0.0,False))
     return meshes_list, origin
 
 
-def high_platform_terrain(difficulty: float, cfg: mimic_gym_terrain_cfg.MimicHighPlatformTerrainCfg) -> np.ndarray:
-    """
-    高台只能使用box,如果修改高度场就会出现初始z为最高位置
-    """
-    if len(cfg.high_platform_start_x) != len(cfg.high_platform_width) or len(cfg.high_platform_start_x) != len(cfg.high_platform_height):
-        raise ValueError("high_platform_start_x, high_platform_width, high_platform_height must have the same length.")
-    
-    # 初始化网格列表
-    meshes_list = []
-
-    # --  创建基础地面 --
-    ground_plane = make_plane_box(cfg.size, height=0.0, center_zero=False)
-    meshes_list.append(ground_plane)
-    
-    # -- 定义机器人出生点 --
-    terrain_center = np.array([0.5 * cfg.size[0], 0.5 * cfg.size[1]])
-    origin = np.array([cfg.robot_origin_x, terrain_center[1], 0.05]) # 稍高于平台
-
-    for i in range(len(cfg.high_platform_start_x)):
-        box_size=[cfg.high_platform_width[i]/2,cfg.size[1]/2,cfg.high_platform_height[i]/2]
-        box_center_pos=[cfg.high_platform_start_x[i],0,cfg.high_platform_height[i]/2]
-        box_mesh = create_mujoco_box_mesh(box_size, box_center_pos, origin)
-        meshes_list.append(box_mesh)
-    
-    save_terrain_as_mjcf_with_stl(cfg=cfg, meshes_list=meshes_list, origin=origin, difficulty=difficulty)
-
-
-    return meshes_list, origin
-
-
-
-''' 全新地形 '''
+''' -------------------------全新地形------------------------- '''
 def box_trench_terrain(difficulty: float, cfg: mimic_gym_terrain_cfg.BoxTrenchTerrainCfg) -> np.ndarray:
     """
     生成两块box的沟壑

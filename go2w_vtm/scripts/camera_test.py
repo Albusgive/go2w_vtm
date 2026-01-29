@@ -16,6 +16,7 @@ simulation_app = app_launcher.app
 """Rest everything follows."""
 
 import torch
+import math
 
 import isaaclab.sim as sim_utils
 from isaaclab.assets import AssetBaseCfg
@@ -27,20 +28,26 @@ from isaaclab.scene import InteractiveScene, InteractiveSceneCfg
 from isaaclab.utils import configclass
 from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 from isaaclab.utils.math import subtract_frame_transforms
+from isaaclab.sensors import patterns, RayCasterCameraCfg, RayCasterCfg
+from isaaclab.assets import Articulation
+from isaaclab.terrains.terrain_importer_cfg import TerrainImporterCfg,TerrainImporter
+from isaaclab.assets import RigidObjectCfg
 
 ##
 # Pre-defined configs
 ##
 from go2w_vtm.terrains import ConfirmTerrainImporterCfg
 from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR, ISAACLAB_NUCLEUS_DIR
-from go2w_vtm.terrains.config.rough import CONFIRM_TERRAIN_CFG
+from go2w_vtm.terrains.config.rough import BOX_TERRAIN_CFG
 from go2w_vtm.terrains.mimic_gym_terrain_cfg import SaveTerrainCfg
+from go2w_vtm.Robot.go2w import UNITREE_GO2W_CFG
+from go2w_vtm.sensors.ray_caster_camera import MyRayCasterCameraCfg
 
 @configclass
-class TableTopSceneCfg(InteractiveSceneCfg):
+class SceneCfg(InteractiveSceneCfg):
     """Configuration for a cart-pole scene."""
 
-    terrain = ConfirmTerrainImporterCfg(
+    terrain = TerrainImporterCfg(
         prim_path="/World/ground",
         terrain_type="generator",
         max_init_terrain_level=5,
@@ -56,23 +63,44 @@ class TableTopSceneCfg(InteractiveSceneCfg):
             project_uvw=True,
             texture_scale=(0.25, 0.25),
         ),
+        terrain_generator = BOX_TERRAIN_CFG,
         debug_vis=True,
-        checkpoint_debug_vis=True,
-        terrain_generator=CONFIRM_TERRAIN_CFG,
     )
-
+    
+    robot = UNITREE_GO2W_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
     light = AssetBaseCfg(
         prim_path="/World/light",
         spawn=sim_utils.DistantLightCfg(color=(0.75, 0.75, 0.75), intensity=3000.0),
     )
+    
+    ray_caster_camera = MyRayCasterCameraCfg(
+        prim_path="{ENV_REGEX_NS}/Robot/base",
+        offset=RayCasterCameraCfg.OffsetCfg(pos=(0.35, 0.0, 0.03),
+                                            rot = (math.cos(math.radians(15)/2), 0, math.sin(math.radians(15)/2), 0),
+                                            convention="world"),
+        ray_alignment='yaw',
+        pattern_cfg=patterns.PinholeCameraPatternCfg(
+            focal_length=1.0,
+            horizontal_aperture=2 * math.tan(math.radians(89.51) / 2),  # fovx
+            vertical_aperture=2 * math.tan(math.radians(58.29) / 2),  # fovy
+            width=32,
+            height=18,),
+        debug_vis=True,
+        mesh_prim_paths=["/World/ground"],
+        data_types=["distance_to_camera"],
+    )
 
 
 def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
-    
+    robot: Articulation = scene["robot"]
+    terrain: TerrainImporter = scene["terrain"]
     while simulation_app.is_running():
-        sim.render()
-
-
+        root_state = robot.data.default_root_state.clone()
+        root_state[0,:2] = terrain.env_origins[0,:2]
+        robot.write_root_state_to_sim(root_state)
+        scene.update(sim.cfg.dt)
+        sim.step()
+        
 def main():
     """Main function."""
     # Load kit helper
@@ -81,13 +109,7 @@ def main():
     # Set main camera
     sim.set_camera_view([2.5, 2.5, 2.5], [0.0, 0.0, 0.0])
     # Design scene
-    scene_cfg = TableTopSceneCfg(num_envs=10, env_spacing=2.0)
-    scene_cfg.terrain.terrain_generator.sub_terrains
-    print(type(scene_cfg.terrain.terrain_generator.sub_terrains))
-    for value in scene_cfg.terrain.terrain_generator.sub_terrains.values():
-        if isinstance(value, SaveTerrainCfg):
-            terrain: SaveTerrainCfg = value
-            terrain.save_to_mjcf = True
+    scene_cfg = SceneCfg(num_envs=1, env_spacing=2.0)
     scene = InteractiveScene(scene_cfg)
     # Play the simulator
     sim.reset()

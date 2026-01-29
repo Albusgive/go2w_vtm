@@ -8,7 +8,7 @@ from ..multi_motion_env_cfg import ActionsCfg, MultiMotionEnvCfg, ObservationsCf
 
 import go2w_vtm
 from go2w_vtm.Robot.go2w import UNITREE_GO2W_CFG,UNITREE_GO2W_NO_MOTOR_LIMIT_CFG,UNITREE_GO2W_GHOST_CFG
-from go2w_vtm.terrains.config.rough import CONFIRM_TERRAIN_CFG2
+from go2w_vtm.terrains.config.rough import CONFIRM_TERRAIN_CFG
 
 from isaaclab.utils.noise import UniformNoiseCfg
 import os
@@ -91,7 +91,7 @@ class UnitreeGo2WMultiMotionEnvCfg(MultiMotionEnvCfg):
             self.scene.ray_caster_camera = None
         # ------------------------------Terrain------------------------------
         self.scene.terrain.terrain_type = "generator"
-        self.scene.terrain.terrain_generator = CONFIRM_TERRAIN_CFG2
+        self.scene.terrain.terrain_generator = CONFIRM_TERRAIN_CFG
         self.scene.terrain.debug_vis = False
         self.scene.terrain.checkpoint_debug_vis = False
         # ------------------------------commands------------------------------
@@ -174,9 +174,6 @@ class UnitreeGo2WMultiMotionEnvCfg(MultiMotionEnvCfg):
         self.rewards.joint_limit.params["asset_cfg"] = SceneEntityCfg(
             "robot", joint_names=self.leg_joint_names
         )
-        # ------------------------------Termination------------------------------
-        # self.terminations.anchor_pos = None
-        # self.terminations.anchor_ori = None
 
         # If the weight of rewards is 0, set rewards to None
         if self.__class__.__name__ == "UnitreeGo2WMultiMotionEnvCfg":
@@ -203,11 +200,7 @@ class UnitreeGo2WMultiMotionEnvDistillCfg(UnitreeGo2WMultiMotionEnvCfg):
         # ------------------------------Observations------------------------------
         self.observations.policy = None
         self.observations.critic = None
-        # ------------------------------commands------------------------------
-        self.commands.motion.is_play_mode = True
-        # ------------------------------Termination------------------------------
-        self.terminations.anchor_pos = None
-        self.terminations.anchor_ori = None
+
         
         self.rewards: ZeroRewardsCfg = ZeroRewardsCfg()
         

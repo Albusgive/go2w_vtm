@@ -99,124 +99,7 @@ FLAT_TERRAINS_CFG = TerrainGeneratorCfg(
 )
 
 
-MIMIC_GYM_TERRAIN_CFG = TerrainGeneratorCfg(
-    size=(3, 2.5),
-    border_width=20.0,
-    num_rows=5,
-    num_cols=10,
-    horizontal_scale=0.1,
-    vertical_scale=0.005,
-    slope_threshold=0.75,
-    use_cache=False,
-    curriculum=True,
-    # color_scheme="random",
-    sub_terrains={
-        "mimic_trench": terrain_gen.MimicFixBoxTerrainCfg(
-            # proportion=0.5, 
-            
-            high_platform_x=[0.0,2.35],  
-            high_platform_z=[-0.5,-0.5],      
-            high_platform_half_width=[1.0,1.0],
-            high_platform_half_height=[0.5,0.5],
-            
-            robot_origin_x = 0.8,
-                
-            save_to_mjcf = True,
-            mesh_path = go2w_vtm.GO2W_MJCF_DIR + "/meshs/",
-            mjcf_path = go2w_vtm.GO2W_MJCF_DIR,
-        ),
-        # "mimic_high_platform": terrain_gen.MimicFixBoxTerrainCfg(
-        #     # proportion=0.5,
-            
-        #     high_platform_x=[0.0,1.5],  
-        #     high_platform_z=[-0.5,0.0],      
-        #     high_platform_half_width=[0.75,0.75],
-        #     high_platform_half_height=[0.5,0.4],
-            
-        #     robot_origin_x = 0.8,
-            
-        #     save_to_mjcf = True,
-        #     mesh_path = go2w_vtm.GO2W_MJCF_DIR + "/meshs/",
-        #     mjcf_path = go2w_vtm.GO2W_MJCF_DIR,
-        # ),
-    }
-)
-
-
-
 CONFIRM_TERRAIN_CFG = ConfirmTerrainGeneratorCfg(
-    size=(3, 2.5),
-    border_width=20.0,
-    num_rows=5,
-    num_cols=10,
-    horizontal_scale=0.1,
-    vertical_scale=0.005,
-    slope_threshold=0.75,
-    use_cache=False,
-    curriculum=True,
-    # color_scheme="random",
-    sub_terrains={
-        "mimic_trench": terrain_gen.MimicFixBoxTerrainCfg(
-            # proportion=0.5, 
-            
-            high_platform_x=[0.0,2.35],  
-            high_platform_z=[-0.5,-0.5],      
-            high_platform_half_width=[1.0,1.0],
-            high_platform_half_height=[0.5,0.5],
-            
-            robot_origin_x = 0.8,
-                
-            save_to_mjcf = True,
-            mesh_path = go2w_vtm.GO2W_MJCF_DIR + "/meshs/",
-            mjcf_path = go2w_vtm.GO2W_MJCF_DIR,
-        ),
-        "mimic_high_platform": terrain_gen.MimicFixBoxTerrainCfg(
-            # proportion=0.5,
-            
-            high_platform_x=[0.0,1.5],  
-            high_platform_z=[-0.5,0.0],      
-            high_platform_half_width=[0.75,0.75],
-            high_platform_half_height=[0.5,0.4],
-            
-            robot_origin_x = 0.8,
-            
-            save_to_mjcf = True,
-            mesh_path = go2w_vtm.GO2W_MJCF_DIR + "/meshs/",
-            mjcf_path = go2w_vtm.GO2W_MJCF_DIR,
-        ),
-        # "mimic_trench": terrain_gen.BoxTrenchTerrainCfg(
-        #     # proportion=0.5, 
-            
-        #     trench_x = 1.2,                                 
-        #     trench_width = (0.2,0.5),
-        #     trench_depth = 1.5,
-            
-        #     robot_origin_x = 0.8,
-                
-        #     save_to_mjcf = True,
-        #     mesh_path = go2w_vtm.GO2W_MJCF_DIR + "/meshs/",
-        #     mjcf_path = go2w_vtm.GO2W_MJCF_DIR,
-        # ),
-        
-        # "mimic_trench": terrain_gen.MimicFixBoxTerrainCfg(
-        #     # proportion=0.5, 
-            
-        #     high_platform_x=[0.0,2.35],  
-        #     high_platform_z=[-0.5,-0.5],      
-        #     high_platform_half_width=[1.0,1.0],
-        #     high_platform_half_height=[0.5,0.5],
-            
-        #     robot_origin_x = 0.8,
-                
-        #     save_to_mjcf = True,
-        #     mesh_path = go2w_vtm.GO2W_MJCF_DIR + "/meshs/",
-        #     mjcf_path = go2w_vtm.GO2W_MJCF_DIR,
-        # ),
-    }
-)
-
-
-CONFIRM_TERRAIN_CFG2 = ConfirmTerrainGeneratorCfg(
     size=(5, 3.0),
     border_width=20.0,
     num_rows=5,
@@ -292,5 +175,28 @@ CONFIRM_TERRAIN_CFG2 = ConfirmTerrainGeneratorCfg(
             
         #     terrain_name = "test_box_float_box_terrain"
         # ),
+    }
+)
+
+
+
+BOX_TERRAIN_CFG = ConfirmTerrainGeneratorCfg(
+    size=(3, 2.5),
+    border_width=20.0,
+    num_rows=1,
+    num_cols=1,
+    horizontal_scale=0.1,
+    vertical_scale=0.005,
+    slope_threshold=0.75,
+    sub_terrains={
+        "box": terrain_gen.FixBoxTerrainCfg(
+            box_pos = [
+                (2.0,0.0,1.0)
+            ],
+            box_half_size=[
+                (0.5,2.5,1.0)
+            ],
+
+        ),
     }
 )

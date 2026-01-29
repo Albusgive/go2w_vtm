@@ -34,41 +34,8 @@ class SaveTerrainCfg(SubTerrainBaseCfg):
     
     def make_check_points(self, difficulty: float)->Tuple[List[np.ndarray], List[str]]:
         return None, None
-    
-
-@configclass
-class MimicFixBoxTerrainCfg(SaveTerrainCfg):
-    
-    function = mimic_gym_terrain.fix_box_terrain
-    ''' 下列参数均是基于机器人坐标偏移 '''
-    high_platform_x: list[float] = MISSING                 
-    high_platform_z: list[float] = MISSING                     
-    high_platform_half_width: list[float] = MISSING                       
-    high_platform_half_height: list[float] = MISSING  
-    
-    robot_origin_x: float = 1.5
-    
-    terrain_x: float = 0.0
-    
-    terrain_name: str = "trench_box_terrain"
 
 
-
-@configclass
-class MimicHighPlatformTerrainCfg(SaveTerrainCfg):
-    
-    function = mimic_gym_terrain.high_platform_terrain
-    high_platform_start_x: list[float] = MISSING                     
-    high_platform_width: list[float] = MISSING                       
-    high_platform_height: list[float] = MISSING  
-    
-    robot_origin_x: float = 1.5
-    
-    terrain_name: str = "high_platform"
-    
-    
-
-''' 全新地形 ''' 
 @configclass
 class BoxTrenchTerrainCfg(SaveTerrainCfg):
     ''' 两块box组成的沟壑 '''
@@ -172,3 +139,12 @@ class BoxFloatBoxTerrainCfg(SaveTerrainCfg):
             float_box_long=self.float_box_long,
             float_box_float_height=self.float_box_float_height,
             float_box_height=self.float_box_height,)
+        
+        
+@configclass
+class FixBoxTerrainCfg(SubTerrainBaseCfg):
+    
+    function = mimic_gym_terrain.fix_box_terrain
+    ''' 下列参数均是基于机器人坐标偏移 '''
+    box_pos: list[tuple[float, float, float]] = MISSING                                    
+    box_half_size: list[tuple[float, float, float]] = MISSING          

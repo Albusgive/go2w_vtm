@@ -30,6 +30,7 @@ import go2w_vtm.locomotion.mdp as mdp
 from isaaclab.terrains.config.rough import ROUGH_TERRAINS_CFG
 from go2w_vtm.terrains.config.rough import GO2W_ROUGH_TERRAINS_CFG
 from go2w_vtm.terrains import ConfirmTerrainImporterCfg
+from go2w_vtm.sensors.ray_caster_camera import MyRayCasterCameraCfg
 
 ##
 # Scene definition
@@ -87,14 +88,19 @@ class MySceneCfg(InteractiveSceneCfg):
         prim_path="/World/light",
         spawn=sim_utils.DistantLightCfg(color=(0.75, 0.75, 0.75), intensity=3000.0),
     )
-    ray_caster_camera = RayCasterCameraCfg(
+    ray_caster_camera = MyRayCasterCameraCfg(
         prim_path="{ENV_REGEX_NS}/Robot/base",
-        offset=RayCasterCameraCfg.OffsetCfg(pos=(0.4, 0.0, 0.03), convention="world"),
+        offset=RayCasterCameraCfg.OffsetCfg(pos=(0.35, 0.0, 0.03),
+                                            rot = (math.cos(math.radians(15)/2), 0, math.sin(math.radians(15)/2), 0),
+                                            convention="world"),
         ray_alignment='yaw',
-        pattern_cfg=patterns.PinholeCameraPatternCfg(width=32, height=18, focal_length=11.41,
-                                                     horizontal_aperture=2 * math.tan(math.radians(89.51) / 2),
-                                                     vertical_aperture=2 * math.tan(math.radians(58.29) / 2)),
-        debug_vis=False,
+        pattern_cfg=patterns.PinholeCameraPatternCfg(
+            focal_length=1.0,
+            horizontal_aperture=2 * math.tan(math.radians(89.51) / 2),  # fovx
+            vertical_aperture=2 * math.tan(math.radians(58.29) / 2),  # fovy
+            width=32,
+            height=18,),
+        debug_vis=True,
         mesh_prim_paths=["/World/ground"],
         data_types=["distance_to_camera"],
     )
@@ -378,6 +384,10 @@ class TerminationsCfg:
     #     },
     # )
     
+@configclass
+class TimeoutTerminationsCfg:
+    time_out = DoneTerm(func=mdp.time_out, time_out=True)
+    
 
 @configclass
 class CurriculumCfg:
@@ -422,12 +432,6 @@ class MultiMotionEnvCfg(ManagerBasedRLEnvCfg):
 
         # check if terrain levels curriculum is enabled - if so, enable curriculum for terrain generator
         # this generates terrains with increasing difficulty and is useful for training
-        if getattr(self.curriculum, "terrain_levels", None) is not None:
-            if self.scene.terrain.terrain_generator is not None:
-                self.scene.terrain.terrain_generator.curriculum = True
-        else:
-            if self.scene.terrain.terrain_generator is not None:
-                self.scene.terrain.terrain_generator.curriculum = False
                 
         self.long_time_no_move_flag = True
 
@@ -439,7 +443,9 @@ class MultiMotionEnvCfg(ManagerBasedRLEnvCfg):
                 if reward_attr != None:
                     if not callable(reward_attr) and reward_attr.weight == 0:
                         setattr(self.rewards, attr, None)
-
+    
+    def only_time_out_termination(self):
+        self.terminations = TimeoutTerminationsCfg()
 
 def create_obsgroup_class(class_name, terms, enable_corruption=False, concatenate_terms=True):
     """
