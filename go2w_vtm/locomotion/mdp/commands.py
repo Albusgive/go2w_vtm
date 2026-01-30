@@ -1537,12 +1537,6 @@ body_linv和body_angv可以通过差分计算 ✅
 效率优化 ✅：完全的ghost robot的数据读取
 """
 
-def print_tensor_memory(tensor, name="Tensor"):
-    # element_size() 返回单个元素的字节数 (例如 float32 是 4 字节)
-    # nelement() 返回张量中元素的总数
-    byte_size = tensor.nelement() * tensor.element_size()
-    mb_size = byte_size / (1024 ** 2)
-    print(f"{name} 占用显存: {byte_size} 字节 | {mb_size:.4f} MB")
 
 from go2w_vtm.utils.MocapInterpolator import MocapInterpolator
 class MotionGenerator(CommandTerm):
@@ -1620,6 +1614,8 @@ class MotionGenerator(CommandTerm):
 
         # 初始化命令速度缓存 [num_envs, 3] (vx, vy, wz)
         self._cmd_vel = torch.zeros(self.num_envs, 3, device=self.device)
+        # 大于last_key_time_step后cmd_vel会置0
+        self.last_key_time_step = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
         
         
         self._compute_interpolation(torch.arange(self.num_envs, device=self.device))    
@@ -1645,8 +1641,11 @@ class MotionGenerator(CommandTerm):
     @property
     def velocity_command(self) -> torch.Tensor:
         """返回当前每个环境对应的目标参考速度 [num_envs, 3]"""
-        return self._cmd_vel
-
+        cmd_vel = self._cmd_vel.clone()
+        after_last_key_mask = self.time_steps >= self.last_key_time_step
+        cmd_vel[after_last_key_mask] = 0.0
+        return cmd_vel
+    
     @property
     def joint_pos(self) -> torch.Tensor:
         return self.ik_cmd.joint_pos[:, self.joint_indices]
@@ -1776,7 +1775,7 @@ class MotionGenerator(CommandTerm):
             # 调用插值器
             max_buf = self.interpolator_root_pose_w.shape[1]
             interpolator:MocapInterpolator = self.interpolator_map[t_type_item]
-            root_pose, target_pose_b, total_frames = interpolator.interpolate(
+            root_pose, target_pose_b, total_frames, last_key_idx = interpolator.interpolate(
                 compact_checkpoints, 
                 cmd_vel, 
                 max_buf, 
@@ -1785,6 +1784,7 @@ class MotionGenerator(CommandTerm):
             self.interpolator_root_pose_w[type_env_ids] = root_pose
             self.interpolator_tergets_pose_b[type_env_ids] = target_pose_b
             self.time_step_totals[type_env_ids] = total_frames
+            self.last_key_time_step[type_env_ids] = last_key_idx
         
         
     def _update_metrics(self):
@@ -1892,6 +1892,7 @@ class MotionGenerator(CommandTerm):
         all_ids = torch.arange(self.num_envs, device=self.device)
         root_pose_ref = self.interpolator_root_pose_w[all_ids, self.time_steps]
         ee_targets_b = self.interpolator_tergets_pose_b[all_ids, self.time_steps]
+        
 
         # 4. 调用迁移后的 IK+FK 一体化函数
         # 这一步会自动更新 ik_cmd 内部的 joint_pos, body_pos_w, body_vel 等全量数据

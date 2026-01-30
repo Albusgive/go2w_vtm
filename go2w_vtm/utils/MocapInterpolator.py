@@ -63,6 +63,9 @@ class MocapInterpolator:
         dt, steps_per_seg, root_abs_pos = self._calculate_dt_and_steps(terrain_key_pos, cmd_vel, fps)
         actual_num_segs = dt.shape[1] # 可能是 K-1 或 K
         
+        num_main_segs = self.num_keys - 1
+        last_key_frame_idx = torch.sum(steps_per_seg[:, :num_main_segs] - 1, dim=1) 
+        
         # 计算总帧数 (所有段步数和 - 重叠点数)
         total_frames = torch.sum(steps_per_seg, dim=1) - (actual_num_segs - 1)
         
@@ -131,7 +134,7 @@ class MocapInterpolator:
             
             current_offsets += copy_counts
 
-        return res_root, res_targets, total_frames
+        return res_root, res_targets, total_frames, last_key_frame_idx
 
     def get_total_frames_per_env(self, terrain_key_pos, cmd_vel, fps=50):
         # 复用逻辑确保总帧数一致

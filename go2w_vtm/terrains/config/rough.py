@@ -120,7 +120,7 @@ CONFIRM_TERRAIN_CFG = ConfirmTerrainGeneratorCfg(
             
             robot_origin_x = 0.8,
             
-            save_to_mjcf = True,
+            save_to_mjcf = False,
             mesh_path = go2w_vtm.GO2W_MJCF_DIR + "/meshs/",
             mjcf_path = go2w_vtm.GO2W_MJCF_DIR,
             

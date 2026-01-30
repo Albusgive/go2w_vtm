@@ -12,3 +12,4 @@ go2w_vtm/produce_motion/__pycache__/
 go2w_vtm/terrains/__pycache__/
 go2w_vtm/utils/__pycache__/
 go2w_vtm/terrains/config/__pycache__/
+logs/rsl_rl/fetch_logs.sh

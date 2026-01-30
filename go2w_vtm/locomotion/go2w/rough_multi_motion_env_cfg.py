@@ -159,7 +159,7 @@ class UnitreeGo2WMultiMotionEnvCfg(MultiMotionEnvCfg):
         # ------------------------------Rewards------------------------------
         self.rewards.action_rate_l2.weight = -1e-2
         self.rewards.joint_limit.weight = -1.0
-        # self.rewards.motion_body_pos.weight = 1.0
+        self.rewards.motion_body_pos.weight = 1.5
         # self.rewards.motion_body_lin_vel.weight = 1.0
         # self.rewards.motion_global_anchor_pos.weight = 1.0
         # self.rewards.motion_global_anchor_ori.weight = 0.8
@@ -194,7 +194,7 @@ class UnitreeGo2WMultiMotionEnvDistillCfg(UnitreeGo2WMultiMotionEnvCfg):
         super().__post_init__()
         # ------------------------------Vis------------------------------
         self.commands.motion.debug_vis = True
-        self.commands.motion.ik_cfg.robot_vis = True
+        self.commands.motion.ik_cfg.robot_vis = False
         self.scene.ray_caster_camera.debug_vis = True
         
         # ------------------------------Observations------------------------------
